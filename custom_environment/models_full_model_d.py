@@ -6,13 +6,10 @@ import networkx as nx
 
 class models_full_model(torch.nn.Module):
     def get_safe_action_mask(self,mask, x_state, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,neighbors=0,position=0):
-        """
-    Returns a binary mask [50] where 1.0 = Mathematically Safe, 0.0 = Forbidden.
-    """
-        threshold=num_moves
-        assert neighbors[position]==1
-        with torch.no_grad():
-            # 1. Current Safety h(x_t)
+            
+            threshold=num_moves
+            assert neighbors[position]==1
+                # 1. Current Safety h(x_t)
             
             predicted_u_current = unc_net(x_state, edge_index,num_moves)
             h_t = threshold - torch.max(predicted_u_current)
@@ -35,8 +32,8 @@ class models_full_model(torch.nn.Module):
             # If no nodes are safe (empty set), we MUST pick the node that 
             # maximizes h(x_t+1) to minimize the violation.
         
-        mask=torch.tensor(mask)*safe_mask
-        if mask.sum() == 0:
+            mask=torch.tensor(mask)*safe_mask
+            if mask.sum() == 0:
             min_val=0
             min_node=0
             for node in range(50):
@@ -46,8 +43,8 @@ class models_full_model(torch.nn.Module):
                         min_node=node
             mask[min_node] = 1
         #print(f"safe mask of cur pos is {mask[position]}")
-        mask[position]=1
-        return mask
+            mask[position]=1
+            return mask
     def __init__(self, number_of_nodes):
         
         super().__init__()

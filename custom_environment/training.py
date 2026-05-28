@@ -1,25 +1,27 @@
 from custom_graph_env import GraphEnv
 import torch
 import os
-from torch.nn.modules.container import ParameterList
 from torch.distributions import Categorical
-
+import argparse as argp
 import logging
 from math import trunc
 import numpy as np
 import os
+import logging
 from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
 from gymnasium.wrappers import RecordEpisodeStatistics
 class trainer():
+
     def __init__(self,model):
         self.model = model
+        
     def save_marl_checkpoint(self,episode, obs_nets, unc_nets, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0):
         # Create directory if it doesn't exist
         if not os.path.exists(path):
             os.makedirs(path)
 
-        # We pack everything into one dictionary
+        # Pack everything into one dictionary
         checkpoint = {
             'episode': episode,
             # Save every agent's model weights
@@ -114,7 +116,6 @@ class trainer():
         return total_loss
 
     def train_loop(self,num_nodes,num_agents):
-        import logging
         logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
         logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
 
@@ -222,13 +223,7 @@ class trainer():
             for agent in env.agents:
                 reward_history[agent].append(rewards[agent])
             uncertainty_history.append(env.tot_unc)
-        #  logging.info(f"Rewards: {list(rewards.values())}")
 
 
 if __name__=="__main__":
-    homunculus=trainer()
-    nodes_for_data=[50]
-    num_agents_for_testing=[4]
-    for nn in nodes_for_data:
-        for ag in num_agents_for_testing:
-            homunculus.train_loop(num_nodes=nn,num_agents=ag)
+   parser = argp.ArgumentParser(description="Parser for training loop")

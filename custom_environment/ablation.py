@@ -1,8 +1,8 @@
-from models_extra_attention_d import models_extra_attention
-from models_no_dcbf_d import models_no_dcbf
-from models_no_dcbf_no_state_estimation_d import models_no_dcbf_no_state_est
+from custom_environment.model_variants.models_extra_attention_d import models_extra_attention
+from custom_environment.model_variants.models_no_dcbf_d import models_no_dcbf
+from custom_environment.model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbf_no_state_est
 from models_full_model_d import models_full_model
-from models_no_state_estimation import models_no_state_est
+from custom_environment.model_variants.models_no_state_estimation import models_no_state_est
 from training import trainer 
 model_list = [models_no_dcbf,models_no_dcbf_no_state_est,models_full_model,models_no_state_est]
 

@@ -89,12 +89,9 @@ class GraphEnv(pettingzoo.ParallelEnv):
         self.model_path = "./saved_models" 
         self.max_uncertainty:int = 100
         self.mmap = {agent:nx.Graph() for agent in self.possible_agents}
-        self.mistakes = {agent:0 for agent in self.possible_agents}
         ###print(f"node uncertainty is {self.node_unc}")
         self.rewards = {agent:0 for agent in self.agents}
         self.infos = {agent:{} for agent in self.agents}
-        self.current_obs = {agent:None for agent in self.possible_agents}
-        self.personal_graph = {agent:None for agent in self.possible_agents}
         #self.per_agent_covered = {agent:set() for agent in self.possible_agents}
         self.terminations = {agent:False for agent in self.agents}
 
