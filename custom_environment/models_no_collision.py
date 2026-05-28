@@ -4,48 +4,37 @@ from torch_geometric.nn import GAT, TransformerConv, MLPAggregation
 from torch_geometric.utils import from_networkx, get_laplacian, to_dense_adj, add_self_loops
 import networkx as nx
 
-class models_full_model(torch.nn.Module):
+class models_no_collision(torch.nn.Module):
     
     def get_safe_action_mask(self,mask, x_state, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,neighbors=0,position=0):
+        """
+    Returns a binary mask [50] where 1.0 = Mathematically Safe, 0.0 = Forbidden.
+    """
+        x_state=x_state.tolist()
+        #print(x_state)
+        threshold=num_moves
+        #assert neighbors[position]==1
+        with torch.no_grad():
+            # 1. Current Safety h(x_t)
+            buffer_at_least_one_one=0
+            for node in neighbors:
+                if x_state[node][1]==1:
+                    mask[node]=0
+                else:
+                    buffer_at_least_one_one=1
             
-            threshold=num_moves
-            assert neighbors[position]==1
-                # 1. Current Safety h(x_t)
-            
-            predicted_u_current = unc_net(x_state, edge_index,num_moves)
-            h_t = threshold - torch.max(predicted_u_current)
+            if buffer_at_least_one_one==0:
+                max_node=0
+                max_unc=0
+                for node in neighbors:
+                    if x_state[node][0]>max_unc:
+                        max_node=node
+                        max_unc=x_state[node][0]
+                mask[max_node]=1
 
-            # 2. Define the Barrier Bound
-            # The paper's condition: h(x_t+1) >= (1 - eta) * h(x_t)
-            lower_bound = (1 - eta) * h_t
-            #print(f"lower bound is {lower_bound}")
-            # 3. Predict h(x_t+1) for EVERY possible action (node)
-            safe_mask = torch.zeros(self.number_of_nodes)
-            for node_idx in range(self.number_of_nodes):
-                # Evaluate the safety of the specific target node
-                # h(x_t+1) = threshold - uncertainty_at_target_node
-                h_next = threshold - predicted_u_current[node_idx]
-                
-                if h_next >= lower_bound:
-                    safe_mask[node_idx] = 1
-                    
-            # 4. Critical Safety Check (Hard Override)
-            # If no nodes are safe (empty set), we MUST pick the node that 
-            # maximizes h(x_t+1) to minimize the violation.
-        
-            mask=torch.tensor(mask)*safe_mask
-            if mask.sum() == 0:
-            min_val=0
-            min_node=0
-            for node in range(50):
-                if node in neighbors:
-                    if (threshold - predicted_u_current[node]) < min_val:
-                        min_val=threshold - predicted_u_current[node]
-                        min_node=node
-            mask[min_node] = 1
         #print(f"safe mask of cur pos is {mask[position]}")
-            mask[position]=1
-            return mask
+        
+        return torch.tensor(mask)
     def __init__(self, number_of_nodes):
         
         super().__init__()

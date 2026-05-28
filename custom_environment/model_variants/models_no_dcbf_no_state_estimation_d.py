@@ -4,7 +4,7 @@ from torch_geometric.nn import GAT, TransformerConv, MLPAggregation
 from torch_geometric.utils import from_networkx, get_laplacian, to_dense_adj, add_self_loops
 import networkx as nx
 
-class models_no_dcbf_no_state_est(torch.nn.Module):
+class models_no_dcbsf_no_state_est(torch.nn.Module):
     def get_safe_action_mask(self,mask, x_state, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,neighbors=0,position=0):
         """
     Returns a binary mask [50] where 1.0 = Mathematically Safe, 0.0 = Forbidden.
@@ -106,7 +106,7 @@ class models_no_dcbf_no_state_est(torch.nn.Module):
 
         #x_enriched = x_enriched.to(self.device)
         edge_index = edge_index.to(self.device)
-        
+
         x = self.graph_attention(x_combined, edge_index)
 
 

@@ -1,7 +1,11 @@
-from custom_graph_env import GraphEnv
+from decentralized_graph_env import GraphEnv
 import torch
 import os
+from models_full_model_d import models_full_model
+
+from torch.nn.modules.container import ParameterList
 from torch.distributions import Categorical
+from models_no_collision import models_no_collision
 import argparse as argp
 import logging
 from math import trunc
@@ -12,9 +16,14 @@ from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
 from gymnasium.wrappers import RecordEpisodeStatistics
 class trainer():
+    def __init__(self,model,max_iters,max_moves=1):
+        self.max_iters=max_iters
+        self.max_moves=max_moves
 
     def __init__(self,model):
         self.model = model
+        
+    def save_marl_checkpoint(self,episode, obs_nets, unc_nets, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0, random_seed=1):
         
     def save_marl_checkpoint(self,episode, obs_nets, unc_nets, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0):
         # Create directory if it doesn't exist
@@ -31,23 +40,19 @@ class trainer():
         }
 
         # Save to a temporary file first, then rename (prevents corruption if job dies mid-save)
-        temp_path = f"{path}_ckpt_{episode}_{n_num}_{ag_num}_{epoch}_{self.model}.tmp"
-        final_path = f"{path}_ckpt_{episode}_{n_num}_{ag_num}_{epoch}_{self.model}.pt"
-        print("saving ckpt")
+        temp_path = f"{path}ckpoint_dense_{episode}_final_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}.tmp"
+        final_path = f"{path}ckpoint_dense_{episode}_final_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}.pt"
+        print(f"saving ckpt {path}_ckpoint_{episode}_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}")
         torch.save(checkpoint, temp_path)
         os.rename(temp_path, final_path)
         
         # Also keep a 'latest' pointer for easy reloading
         torch.save(checkpoint, f"{path}latest.pt")
         #print(f"--- Checkpoint saved at Episode {episode} ---")
-    logger = logging.getLogger("logger_train")
-    logging.basicConfig(filename='debug_8.log', level=logging.INFO)
-    #print("logger created")
-    logger.info("------ Logger Started ------")
-    logger.info("num_moves, agent, total_loss, action, uncertainty, value, next_val, occ_nodes, unc_loss")
+    
 
     cur_length_list = []
-    def save_diagnostic_plots(self,step, agents,reward_history,epoch,uncertainty_history):
+    def diagnostic_plots(self,step, agents,reward_history,epoch,uncertainty_history):
         """
         Saves a diagnostic figure to the /results folder.
         """
@@ -115,6 +120,15 @@ class trainer():
         assert total_loss.shape == torch.Size([1])
         return total_loss
 
+    def train_loop(self,num_nodes,num_agents,random_seed):
+        import logging
+        torch.manual_seed(random_seed)
+        logger = logging.getLogger("logger_train")
+        logging.basicConfig(filename='freezing_train.log', level=logging.INFO)
+    #print("logger created")
+        logger.info("------ Logger Started ------")
+        logger.info("num_moves, agent, reward, total_loss, action, uncertainty, value, next_val, occ_nodes, unc_loss")
+        env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents,max_moves=self.max_moves)
     def train_loop(self,num_nodes,num_agents):
         logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
         logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
@@ -144,19 +158,20 @@ class trainer():
         critic_loss_dict = {}
         # Main Episode Loop
         reward_history:dict = {agent:[] for agent in env.possible_agents}
-        max_iters=25
+        max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
         while env.agents and max_iters>num_iters:
             #print(env.num_moves)
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
-                self.save_marl_checkpoint(episode=env.num_moves,obs_nets=obs_nets,unc_nets=env.agent_to_net,optimizers=optimizers,epoch=env.num_epochs,ag_num=num_agents,n_num=num_nodes)
-                #self.save_diagnostic_plots(step=env.num_moves,agents=env.possible_agents,reward_history=reward_history[agent],epoch=env.num_epochs,uncertainty_history=uncertainty_history)
+                self.save_marl_checkpoint(episode=env.num_moves,obs_nets=obs_nets,unc_nets=env.agent_to_net,optimizers=optimizers,epoch=env.num_epochs,ag_num=num_agents,n_num=num_nodes,random_seed=random_seed)
+                #self.diagnostic_plots(step=env.num_moves,agents=env.possible_agents,reward_history=reward_history[agent],epoch=env.num_epochs,uncertainty_history=uncertainty_history)
                 env.reset()
+                
                 uncertainty_history = []
                 reward_history:dict = {agent:[] for agent in env.possible_agents}
                 num_iters+=1
-
+                logger.info(f"Iteration Changing to {num_iters}")
 
             actions={}
             step_data={}
@@ -210,20 +225,29 @@ class trainer():
                 # 3. CALCULATE THE COMBINED LOSS
                 # This function (compute_ac_loss) combines Actor and Critic math
                 #   log_prob=torch.max(log_prob)
+                # print(reward)
                 total_loss = self.compute_ac_loss(log_prob[agent], value, reward, next_val, done)
 
                 # 4. PERFORM THE UPDATE
                 # This updates BOTH the Actor and Critic weights simultaneously
                 optimizers[agent].zero_grad()
-                logger.info(f"{env.num_moves}, {agent}, {int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
+                logger.info(f"{env.num_moves}, {agent}, {reward} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
                 total_loss.backward()
                 optimizers[agent].step()
                 
             # Logging
             for agent in env.agents:
                 reward_history[agent].append(rewards[agent])
+                
             uncertainty_history.append(env.tot_unc)
 
 
 if __name__=="__main__":
-   parser = argp.ArgumentParser(description="Parser for training loop")
+    homunculus=trainer(max_iters=1000,model=models_full_model,max_moves=500)
+    nodes_for_data=[50]
+    num_agents_for_testing=[4]
+    for nn in nodes_for_data:
+        for ag in num_agents_for_testing:
+            for random_seed in [103,878,422]:
+
+                homunculus.train_loop(num_nodes=nn,num_agents=ag,random_seed=random_seed)

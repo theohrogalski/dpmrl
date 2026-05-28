@@ -19,7 +19,7 @@ class uncertainty_estimator(Module):
             # optional second layer for better graph depth                  
         self.lin = torch.nn.utils.spectral_norm(torch.nn.Linear(2,1))
         self.loss_data=[]
-
+        self.gamma =0.99
         self.optimizer = torch.optim.Adam(self.parameters(),lr=1e-3)
         self.loss_f = torch.nn.MSELoss()
     def make_graph(self,loss_data)->None:
@@ -34,7 +34,7 @@ class uncertainty_estimator(Module):
         #print(move_num.shape)
         #print(x.shape)
         x = torch.concat((x.unsqueeze(1),move_num.unsqueeze(1)),1)
-        x=(self.lin(x))
+        x=(self.lin(x))*self.gamma
         #print(f"shape of x here iss {x.shape}")
         return x
     
