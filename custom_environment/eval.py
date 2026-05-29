@@ -3,18 +3,18 @@ from decentralized_graph_env import GraphEnv
 import random
 from matplotlib import pyplot as plt
 from models_no_collision import models_no_collision
-from models_extra_attention_d import models_extra_attention
-from models_no_dcbf_d import models_no_dcbf
-from models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
+from model_variants.models_extra_attention_d import models_extra_attention
+from model_variants.models_no_dcbf_d import models_no_dcbf
+from model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
 from models_full_model_d import models_full_model
-from models_no_state_estimation import models_no_state_est
+from model_variants.models_no_state_estimation import models_no_state_est
 import logging
 import networkx as nx
 from time import time
 import os
-#agents, optimizers = torch.load("")
+
 import itertools
-#test_env = GraphEnv()
+
 from datetime import datetime
 
 from torch.distributions import Categorical
@@ -23,7 +23,7 @@ from neural_model import uncertainty_estimator as ue
 
 class algorithm_evaluator():
     def __init__(self):
-        #self.ckpt= ckpt
+        
         self.rand=random.randint(0,99999)
         self.model_list = [models_extra_attention,models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est,models_no_collision]
         
@@ -81,12 +81,12 @@ class algorithm_evaluator():
         log_filename = f"{log_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         log_path = os.path.join(log_dir, log_filename)
         
-        # 3. Configure logging
+        
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_path),  # Writes to the subfolder
+                logging.FileHandler(log_path),  
                  ]
             )
 
@@ -101,7 +101,7 @@ class algorithm_evaluator():
 
         unc_nets = check_dict["unc_state_dict"]
         
-        #opt = check_dict["opt_state_dict"]
+        
 
         uncertainty_history = []
         num_iters=0
@@ -130,15 +130,15 @@ class algorithm_evaluator():
                 uncertainty_history=[]
                 num_iters+=1
                 print(f"num iters: {num_iters}")
-                #print(f"Num iters for sit {num_iters}/20")
+                
             for agent in env.agents:
                 logits, value, x_state, edges = obs_net[agent](env.mental_map[agent], env.action_mask_to_node[int(agent[6:])],agent_to_net[agent], num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
-               # print(f"logits for agent {agent} are {logits}")
-               # print(f"pos for agent {agent} are {env.agent_position[agent]}")
+               
+               
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
-               # print(env.rewards)
+               
                 logging.info(f"{env.num_moves}, {agent}, {env.rewards[agent]}  {actions[agent].item()}, {env.tot_unc}, {env.occupied_targets}")
 
             _,_,_,_,_ = env.step(actions)
@@ -170,11 +170,11 @@ class algorithm_evaluator():
                 total_uncertainty_ever=0
                 while env.agents and num_iters<max_iters:
                     if env.num_moves%500==0 and env.num_moves!=0:
-                        #plt.plot(uncertainty_history)
+                        
                         total_uncertainty_ever+=sum(uncertainty_history)
                         print(total_uncertainty_ever)
-                        #plt.set_title("uncertainty_history_random")
-                        #plt.show()
+                        
+                        
                         env.reset()
                         uncertainty_history=[]
                         num_iters+=1
@@ -207,11 +207,11 @@ class algorithm_evaluator():
                 total_uncertainty_ever=0
                 while env.agents and num_iters<max_iters:
                     if env.num_moves%500==0 and env.num_moves!=0:
-                        #plt.plot(uncertainty_history)
+                        
                         total_uncertainty_ever+=sum(uncertainty_history)
                         print(total_uncertainty_ever)
-                        #plt.set_title("uncertainty_history_random")
-                        #plt.show()
+                        
+                        
                         env.reset()
                         uncertainty_history=[]
                         num_iters+=1
@@ -233,15 +233,15 @@ class algorithm_evaluator():
 
                             agent_path_dict[agent]=nx.shortest_path(env.graph,env.agent_position[agent],target=max_unc_node)
                             actions[agent]=torch.tensor(agent_path_dict[agent].pop(0))
-                          #  print(f"{agent} is going to {actions[agent]}")
+                          
 
             
                         elif agent_path_dict[agent] != []:
                             actions[agent]=torch.tensor(agent_path_dict[agent].pop(0))
-                           # print(f"{agent} is going to {actions[agent]}")
+                           
                         else:
                             actions[agent]=torch.tensor(env.agent_position[agent])
-                           # print(f"{agent} is staying")
+                           
                         
 
 
@@ -252,12 +252,12 @@ class algorithm_evaluator():
                 logger.info(total_uncertainty_ever)
                 logger.info(env.longest_time_without_a_visit)
                 logger.info(time()-time_start)
-#eto : eval type object
-def automatic_evaluation_for_grazing(eto):
-    #eto.random()
 
-    #eto.sit_on_nodes()
-    #eto.grazing()
+def automatic_evaluation_for_grazing(eto):
+    
+
+    
+    
     nodes_for_data=[50]
     num_agents_for_testing=[4]
     for nn in nodes_for_data:
@@ -278,7 +278,7 @@ if __name__=="__main__":
     random_seed_list = ["103"]
     
     
-    #ckpt_list=["saving ckpt ./checkpoints/_ckpoint_500_50_4_99_<class 'models_full_model_d.models_full_model'>_422","saving ckpt ./checkpoints/_ckpoint_500_50_4_99_<class 'models_full_model_d.models_full_model'>_"]
+    
     
     third=["_ckpoint_dense_500_final_50_4_99_<class 'models_full_model_d.models_full_model'>_"]
     ckpt_list=[]
@@ -286,11 +286,11 @@ if __name__=="__main__":
     for ckpt in third:
         for rs in random_seed_list:            
             ckpt_list.append(ckpt+rs)
-    #print(ckpt_list)
+    
 
     eval=algorithm_evaluator()
-    # eval.grazing()
-    #eval.sit_on_nodes()
+    
+    
 
     for ckpt in ckpt_list:
         print(ckpt)
