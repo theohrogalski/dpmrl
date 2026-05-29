@@ -25,7 +25,7 @@ class algorithm_evaluator():
     def __init__(self):
         
         self.rand=random.randint(0,99999)
-        self.model_list = [models_extra_attention,models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est,models_no_collision]
+        self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
         
         self.device= "cuda"
     def sit_on_nodes(self):
@@ -145,6 +145,7 @@ class algorithm_evaluator():
             uncertainty_history.append(env.tot_unc)
         logging.info(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
         logging.info(total_uncertainty_ever)
+        
         logging.info(env.longest_time_without_a_visit)
         logging.info(time()-time_start)               
         print(total_uncertainty_ever)
@@ -270,20 +271,20 @@ def automatic_evaluation_for_grazing(eto):
     eval=algorithm_evaluator()
     eval.grazing()"""
 if __name__=="__main__":
-    checkpoint_list_no_=["_ckpoint_500_50_4_99_<class 'models_extra_attention_d.models_extra_attention'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbf_d.models_no_dcbf'>_","_ckpoint_500_50_4_99_<class 'models_full_model_d.models_full_model'>_","_ckpoint_500_50_4_99_<class 'models_no_state_estimation.models_no_state_est'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
+   # checkpoint_list_no_=["_ckpoint_500_50_4_99_<class 'models_extra_attention_d.models_extra_attention'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbf_d.models_no_dcbf'>_","_ckpoint_500_50_4_99_<class 'models_full_model_d.models_full_model'>_","_ckpoint_500_50_4_99_<class 'models_no_state_estimation.models_no_state_est'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
     
-    second_run = ["_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
+   # second_run = ["_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
     evals=[]
-    no_collision = ["ckpoint_dense_500_final_50_4_100_<class 'models_full_model_d.models_full_model'>_"]
     random_seed_list = ["103"]
     
+   # checkpoint_list=["_ckpoint_dense_500_final_50_4_99_<class 'models_no_collision.models_no_collision'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbf_no_state_estimation_d.models_no_dcbf_no_state_est'>_","_ckpoint_500_50_4_99_<class 'models_no_state_estimation.models_no_state_est'>_","","_ckpoint_500_50_4_99_<class 'models_extra_attention_d.models_extra_attention'>_",""]
+    #full_model_list=["ckpoint_dense_500_final_50_4_190_<class 'models_full_model_d.models_full_model'>_"]
     
     
     
     third=["_ckpoint_dense_500_final_50_4_99_<class 'models_full_model_d.models_full_model'>_"]
     ckpt_list=[]
-    model_list = [models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est,models_no_collision]
-    for ckpt in third:
+    for ckpt in no_dcbf_no_state_est:
         for rs in random_seed_list:            
             ckpt_list.append(ckpt+rs)
     
@@ -296,9 +297,11 @@ if __name__=="__main__":
         print(ckpt)
         seed=ckpt[-4:-1]
         for model in eval.model_list:
+
+            print(ckpt)
             if model.__name__ in ckpt:
                 print(f"{model.__name__} --- {ckpt}")
                 model_class=model
         
-   
-        eval.full_model(num_nodes=50,num_agents=4,ckpt=ckpt,model=model_class,log_name=f"Final_Evals",max_iters=20,seed=seed)
+        
+        eval.full_model(num_nodes=50,num_agents=4,ckpt=ckpt,model=model_class,log_name=f"{model.__name__}_data_collection",max_iters=20,seed=seed)

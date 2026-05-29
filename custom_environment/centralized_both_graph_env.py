@@ -111,7 +111,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
             starting_graph.nodes[node]["target"]=0
         ##print(f" starting graph is {starting_graph.nodes()}")
 
-        self.mental_map= {agent:starting_graph.copy() for agent in self.possible_agents}
+        self.mental_map= starting_graph.copy()
         ##print(self.mental_map["agent_0"])
       #  ##print(f"start nodes is {starting_graph.number_of_nodes()}")
         for agent in self.possible_agents:   
@@ -120,11 +120,11 @@ class GraphEnv(pettingzoo.ParallelEnv):
 
             ##print(f"before {self.mental_map[agent].number_of_nodes()}")
             
-            self.mental_map[agent].add_nodes_from(ego.nodes(data=True))
+            self.mental_map.add_nodes_from(ego.nodes(data=True))
             ##print(list(ego.nodes()))
             ##print(list(self.mental_map[agent].nodes()))
             ##print("added nodes")
-            self.mental_map[agent].add_edges_from(ego.edges(data=True))
+            self.mental_map.add_edges_from(ego.edges(data=True))
         self.last_state = {agent:0 for agent in self.possible_agents}
         
         self.episode_num=0
@@ -179,7 +179,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
             return nx.Graph()
     def len_path_in_mm(self,agent)->list:
         shortest_path_list=[]
-        for node in self.mental_map[agent].nodes():
+        for node in self.mental_map.nodes():
             if self.graph.nodes[node]["agent_presence"]==1:
                 shortest_path_list.append(nx.shortest_path_length(self.graph,self.agent_position[agent],node))
         return(shortest_path_list)
@@ -239,7 +239,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
             self.rewards[agent] = 0
             self._cumulative_rewards[agent] = 0
             self.infos[agent] = {}
-        self.mental_map= {agent:starting_graph.copy() for agent in self.possible_agents}
+        self.mental_map= starting_graph.copy()
         #print(self.mental_map["agent_0"].nodes())
         #print(self.graph.nodes())
         self.tot_unc_agent={agent:0 for agent in self.possible_agents}
@@ -249,11 +249,11 @@ class GraphEnv(pettingzoo.ParallelEnv):
 
             ##print(f"before {self.mental_map[agent].number_of_nodes()}")
             
-            self.mental_map[agent].add_nodes_from(ego.nodes(data=True))
+            self.mental_map.add_nodes_from(ego.nodes(data=True))
             ##print(list(ego.nodes()))
             ##print(list(self.mental_map[agent].nodes()))
             ##print("added nodes")
-            self.mental_map[agent].add_edges_from(ego.edges(data=True))
+            self.mental_map.add_edges_from(ego.edges(data=True))
 
         self.reward_graph={agent:[] for agent in self.possible_agents}
         self.agents = (self.possible_agents).copy()
@@ -351,11 +351,11 @@ class GraphEnv(pettingzoo.ParallelEnv):
            # ego_nodes_list:list = [ego.nodes()]
             self.agent_to_two_recent_unc[agent][0] = self.graph.nodes[self.agent_position[agent]]["uncertainty"]
             
-            self.mental_map[agent].add_nodes_from(ego.nodes(data=True))
+            self.mental_map.add_nodes_from(ego.nodes(data=True))
             ##print(list(ego.nodes()))
             ##print(list(self.mental_map[agent].nodes()))
             ##print("added nodes")
-            self.mental_map[agent].add_edges_from(ego.edges(data=True))
+            self.mental_map.add_edges_from(ego.edges(data=True))
 
             ##print(self.mental_map[agent].number_of_nodes())
             #uncertainty_avg=sum(self.mental_map[agent].nodes[node]["uncertainty"] for node in range(self.num_nodes))/self.mental_map[agent].number_of_nodes()

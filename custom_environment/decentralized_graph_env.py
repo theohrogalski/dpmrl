@@ -305,7 +305,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
     def step(self, action:dict):
         ##print(values)for node in self.graph.nodes():
         for node in self.graph.nodes():
-            if self.graph.nodes[node]["agent_presence"]==0:
+            if self.graph.nodes[node]["agent_presence"]==0 and self.graph.nodes[node]["target"]==1:
                 self.visit_list[node]+=1
                 if self.visit_list[node]>self.longest_time_without_a_visit[0]:
                     self.longest_time_without_a_visit=(max(self.visit_list),self.visit_list.index(max(self.visit_list)))
@@ -354,7 +354,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
             if self.agent_to_clearing_cleared[agent]==2:
                 self.agent_to_clearing_cleared[agent]=0
 
-            elif self.agent_to_clearing_cleared[agent]==1 and self.graph.nodes[self.agent_position[agent]]["uncertainty"]==0:
+            elif self.agent_to_clearing_cleared[agent]==1 and self.graph.nodes[self.agent_position[agent]]["uncertainty"]<=self.freeze_steps:
                 self.agent_to_clearing_cleared[agent]=2
                 self.freezing[agent]=0
             elif self.graph.nodes[self.agent_position[agent]]["target"]==1 and self.graph.nodes[self.agent_position[agent]]["uncertainty"]>0:

@@ -1,5 +1,6 @@
 from models_extra_attention_d import models_extra_attention
 from models_no_dcbf_d import models_no_dcbf
+from models_no_collision import models_no_collision
 from models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
 from custom_environment.model_variants.models_extra_attention_d import models_extra_attention
 from custom_environment.model_variants.models_no_dcbf_d import models_no_dcbf
@@ -7,13 +8,13 @@ from custom_environment.model_variants.models_no_dcbf_no_state_estimation_d impo
 from models_full_model_d import models_full_model
 from custom_environment.model_variants.models_no_state_estimation import models_no_state_est
 from training import trainer 
-model_list = [models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est]
+model_list = [models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est,models_no_collision]
 model_list_2=[models_extra_attention]
 if __name__=="__main__":
     for model in model_list_2:
         print(model)
 
-        training_object = trainer(model=model,max_iters=25,max_moves=500)
+        training_object = trainer(model=model,max_iters=100,max_moves=500,saving_dir="ablation")
         
         nodes_for_data=[50]
         random_seeds=[103,878,422]

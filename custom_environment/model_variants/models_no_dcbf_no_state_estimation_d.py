@@ -128,5 +128,5 @@ class models_no_dcbsf_no_state_est(torch.nn.Module):
         # MLPAggregation returns [1, number_of_nodes]
         
         logits = self.actor(x.flatten())
-      
+        
         return logits, value, x_combined, edge_index 

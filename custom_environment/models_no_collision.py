@@ -33,7 +33,9 @@ class models_no_collision(torch.nn.Module):
                 mask[max_node]=1
 
         #print(f"safe mask of cur pos is {mask[position]}")
-        
+        if 1 not in mask:
+            print("error! 1 not in mask.")
+            
         return torch.tensor(mask)
     def __init__(self, number_of_nodes):
         
