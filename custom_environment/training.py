@@ -7,7 +7,6 @@ from torch.nn.modules.container import ParameterList
 from torch.distributions import Categorical
 from models_no_collision import models_no_collision
 import argparse as argp
-from math import trunc
 import numpy as np
 import os
 import logging
@@ -24,7 +23,7 @@ class trainer():
         
         
         
-    def save_marl_checkpoint(self,episode, obs_nets, unc_nets, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0,random_seed=0):
+    def save_marl_checkpoint(self,episode, obs_nets, unc_nets,model, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0,random_seed=0):
         # Create directory if it doesn't exist
         if not os.path.exists(path+self.saving_dir):
             os.makedirs(path+self.saving_dir)
@@ -79,6 +78,19 @@ class trainer():
 
 
     def compute_ac_loss(self,log_prob, value, reward, next_value, done, gamma=0.99):
+        """This functions calculates the combined reward for the actor-critic setup via the difference between the value and the reward combined with the next value.
+
+        Args:
+            log_prob (_type_): _description_
+            value (_type_): _description_
+            reward (_type_): _description_
+            next_value (_type_): _description_
+            done (function): _description_
+            gamma (float, optional): _description_. Defaults to 0.99.
+
+        Returns:
+            _type_: _description_
+        """
         mask = 1 - int(done)
         target = reward + (gamma * next_value * mask)
         advantage = target - value
@@ -89,7 +101,8 @@ class trainer():
         return total_loss
 
    
-    def train_loop(self,num_nodes,num_agents):
+    def train_loop(self,num_nodes,num_agents,random_seed):
+        # Configuring the logger
         logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
         logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
 
@@ -122,9 +135,16 @@ class trainer():
                 logger.info(f"Iteration Changing to {num_iters}")
 
             actions={}
-            step_data={}
+
+            #step_data={}
+
             log_prob={}
+            values={}
             unc_loss_dict = {}
+            # Deprecated step_data approach
+
+            #step_data={}
+            
             for agent in env.agents:
                 logits, value, x_state, edges = obs_nets[agent](mental_map_nx=env.mental_map[agent], mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 unc_net = env.agent_to_net[agent]
@@ -133,24 +153,24 @@ class trainer():
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
-                
-                log_prob[agent] = (actions[agent])
-                step_data[agent] = {
+                               
+                values[agent]=value
+                """step_data[agent] = {
                     "log_prob":log_prob,
                     "value": value,
                     "prediction": unc_net(x_state, edges,env.num_moves).detach() 
-                    }
+                    }"""
 
             """for agent in env.agents:
                 logger.info(f"Action dict is {torch.max(actions[agent])}")"""
             obs, rewards, terminations, truncations, infos = env.step(actions)
 
-            for agent, data in step_data.items():
+            for agent in env.agents:
                 reward = torch.tensor([rewards[agent]], device=dev)
 
                 _,next_val,_,_ = obs_nets[agent](env.mental_map[agent], env.action_mask_to_node[int(agent[6:])],env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
-                value = data["value"]
-                log_prob = data["log_prob"]      
+                value = values[agent]
+                log_prob = actions[agent]
                 if env.step==env.max_moves-1:
                     done=1
                 else:
@@ -170,7 +190,7 @@ class trainer():
 
 
 if __name__=="__main__":
-    homunculus=trainer(max_iters=100,model=models_extra_attention,max_moves=500,saving_dir="ablation")
+    homunculus=trainer(max_iters=100,model=models_full_model, max_moves=500,saving_dir="ablation")
     nodes_for_data=[50]
     num_agents_for_testing=[4]
     for nn in nodes_for_data:
