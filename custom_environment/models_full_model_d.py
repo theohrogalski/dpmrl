@@ -6,7 +6,7 @@ import networkx as nx
 
 class models_full_model(torch.nn.Module):
     
-    def get_safe_action_mask(self,mask:list, x_state, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,neighbors=0,position=0):
+    def get_safe_action_mask(self,mask:list, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
             
             threshold=num_moves
             assert neighbors[position]==1

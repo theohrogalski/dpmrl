@@ -3,18 +3,19 @@ import torch
 import os
 from models_full_model_d import models_full_model
 from random import randint
-from torch.nn.modules.container import ParameterList
 from torch.distributions import Categorical
-from models_no_collision import models_no_collision
-import argparse as argp
-import numpy as np
+import argparse 
+import ast
 import os
 import logging
+import matplotlib
 from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
-from gymnasium.wrappers import RecordEpisodeStatistics
-class trainer():
-    def __init__(self,model,max_iters,saving_dir,max_moves=1):
+
+class trainer:
+
+    def __init__(self,model,max_iters:int,saving_dir:str,max_moves:int=1):
+
         self.max_iters=max_iters
         self.random_num=randint(1,9999999999)
         self.saving_dir=saving_dir
@@ -23,7 +24,21 @@ class trainer():
         
         
         
-    def save_marl_checkpoint(self,episode, obs_nets, unc_nets,model, optimizers,epoch, path="./checkpoints/",ag_num=0, n_num=0,random_seed=0):
+    def save_marl_checkpoint(self,episode, obs_nets, unc_nets,model, optimizers,epoch, path="./checkpoints/",ag_num=0, num_nodes=0,random_seed=0):
+        """_save_marl_checkpoint saves a richly named .pt file containing a trained model at a certain point, including all relevant weights: each of the _
+
+        Args:
+            episode (_int_): _The current episode as an integer_
+            obs_nets : _Observation processing network_
+            unc_nets : _Uncertainty networks used for estimating the uncertainty in the system_
+            model (_str_): _The current model being used to solve the problem_
+            optimizers : _The optimizer objects_
+            epoch (_int_): _The number of the current epoch_
+            path (str, optional): _The path to where the checkpoint should be saved_. Defaults to "./checkpoints/".
+            ag_num (int, optional): _The index of the current agent_. Defaults to 0.
+            num_nodes (int, optional): __. Defaults to 0.
+            random_seed (int, optional): _The random seed_. Defaults to 0.
+        """
         # Create directory if it doesn't exist
         if not os.path.exists(path+self.saving_dir):
             os.makedirs(path+self.saving_dir)
@@ -35,9 +50,9 @@ class trainer():
             'opt_state_dict': {agent: opt.state_dict() for agent, opt in optimizers.items()},
         }
 
-        temp_path = f"{path}ckpoint_dense_{episode}_final_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}.tmp"
-        final_path = f"{path}ckpoint_dense_{episode}_final_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}.pt"
-        print(f"saving ckpt {path}_ckpoint_{episode}_{n_num}_{ag_num}_{epoch}_{self.model}_{random_seed}")
+        temp_path = f"{path}ckpoint_dense_{episode}_final_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}.tmp"
+        final_path = f"{path}ckpoint_dense_{episode}_final_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}.pt"
+        print(f"saving ckpt {path}_ckpoint_{episode}_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}")
         torch.save(checkpoint, temp_path)
         os.rename(temp_path, final_path)
         
@@ -45,17 +60,17 @@ class trainer():
     
 
     cur_length_list = []
-    def diagnostic_plots(self,step, agents,reward_history,epoch,uncertainty_history):
+    def diagnostic_plots(self,step,reward_history,epoch,uncertainty_history,neural_net_history):
         """
-        Saves a diagnostic figure to the /results folder.
+        Saves a figure to the /results folder.
         """
         
-        import matplotlib
         matplotlib.use('Agg') 
         
         fig,ax= plt.subplots(3,3)
-        ax1,ax2,ax3,ax4,ax5, ax6,ax7,ax8,ax9 = ax.flatten()
-        obj_list = [ax2,ax3,ax4,ax5]
+        ax1,ax2,ax3,ax4,ax5, ax6, ax7, ax8, ax9 = ax.flatten()
+        agent_reward_list = [ax2, ax3, ax4, ax5]
+        net_loss_list = [ax6, ax7, ax8, ax9]
 
         ax1.set_title("Uncertainty History")
         ax1.set_xlabel("Timesteps")
@@ -63,7 +78,8 @@ class trainer():
         ax1.plot(uncertainty_history)   
         
         i=0 
-        for axes in obj_list:
+
+        for axes in agent_reward_list:
             
             axes.set_xlabel("Timesteps")
             axes.set_ylabel("Reward per agent")
@@ -78,7 +94,9 @@ class trainer():
 
 
     def compute_ac_loss(self,log_prob, value, reward, next_value, done, gamma=0.99):
-        """This functions calculates the combined reward for the actor-critic setup via the difference between the value and the reward combined with the next value.
+        """
+        This functions calculates the combined reward for the actor-critic 
+        setup via the difference between the value and the reward combined with the next value.
 
         Args:
             log_prob (_type_): _description_
@@ -120,13 +138,16 @@ class trainer():
         reward_total = 0
         critic_loss_dict = {}
         reward_history:dict = {agent:[] for agent in env.possible_agents}
+        net_loss:dict = {agent:[] for agent in env.possible_agents}
         max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
+
+
         while env.agents and max_iters>num_iters:
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
-                self.save_marl_checkpoint(episode=env.num_moves,obs_nets=obs_nets, model=self.model,unc_nets=env.agent_to_net,optimizers=optimizers,epoch=env.num_epochs,ag_num=num_agents,n_num=num_nodes,random_seed=random_seed)
-                #self.diagnostic_plots(step=env.num_moves,agents=env.possible_agents,reward_history=reward_history[agent],epoch=env.num_epochs,uncertainty_history=uncertainty_history)
+                self.save_marl_checkpoint(episode=env.num_moves,obs_nets=obs_nets, model=self.model,unc_nets=env.agent_to_net,optimizers=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
+                self.diagnostic_plots(step=env.num_moves, reward_history=reward_history[agent],epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=net_loss[agent])
                 env.reset()
                 
                 uncertainty_history = []
@@ -185,16 +206,30 @@ class trainer():
             # Logging
             for agent in env.agents:
                 reward_history[agent].append(rewards[agent])
-                
+                net_loss[agent].append()
             uncertainty_history.append(env.tot_unc)
 
 
 if __name__=="__main__":
-    homunculus=trainer(max_iters=100,model=models_full_model, max_moves=500,saving_dir="ablation")
-    nodes_for_data=[50]
-    num_agents_for_testing=[4]
+    parser = argparse.ArgumentParser(prog="Trainer",
+                                    description="""This module trains a team of agents with the given model,
+                                    use build-on modules (e.x. ablation.py to auto-train)
+                                    """)
+    parser.add_argument("--saving_dir",action='store')
+    parser.add_argument("--seed_list",type=list)
+    parser.add_argument("--num_agents_list",type=list)
+    parser.add_argument("--num_nodes_list",type=list)
+
+    parser.add_argument("--model",action='store')
+    parser.add_argument("--max_iters",type=int)
+    parser.add_argument("--max_moves",type=int)
+    parser.add_argument("--max_iters")
+    args = parser.parse_args()
+    train_obj=trainer(max_iters=args.max_iters,model=ast.literal_eval(args.model), max_moves=args.max_moves,saving_dir=args.saving_dir)
+    nodes_for_data=args.num_nodes_list
+    num_agents_for_testing=args.num_agents_list
     for nn in nodes_for_data:
         for ag in num_agents_for_testing:
-            for random_seed in [878,422]:
+            for random_seed in args.seed_list:
 
-                homunculus.train_loop(num_nodes=nn,num_agents=ag,random_seed=random_seed)
+                train_obj.train_loop(num_nodes=nn,num_agents=ag,random_seed=random_seed)
