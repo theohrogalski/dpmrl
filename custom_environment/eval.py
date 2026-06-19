@@ -1,6 +1,8 @@
 import torch
 from decentralized_graph_env import GraphEnv
 import random
+import ast
+import argparse
 from matplotlib import pyplot as plt
 from models_no_collision import models_no_collision
 from model_variants.models_extra_attention_d import models_extra_attention
@@ -271,29 +273,34 @@ def automatic_evaluation_for_grazing(eto):
     eval=algorithm_evaluator()
     eval.grazing()"""
 if __name__=="__main__":
-   # checkpoint_list_no_=["_ckpoint_500_50_4_99_<class 'models_extra_attention_d.models_extra_attention'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbf_d.models_no_dcbf'>_","_ckpoint_500_50_4_99_<class 'models_full_model_d.models_full_model'>_","_ckpoint_500_50_4_99_<class 'models_no_state_estimation.models_no_state_est'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
-    
-   # second_run = ["_ckpoint_500_50_4_99_<class 'models_no_dcbsf_no_state_estimation_d.models_no_dcbf_no_state_est'>_"]
     evals=[]
-    random_seed_list = ["103"]
     
-   # checkpoint_list=["_ckpoint_dense_500_final_50_4_99_<class 'models_no_collision.models_no_collision'>_","_ckpoint_500_50_4_99_<class 'models_no_dcbf_no_state_estimation_d.models_no_dcbf_no_state_est'>_","_ckpoint_500_50_4_99_<class 'models_no_state_estimation.models_no_state_est'>_","","_ckpoint_500_50_4_99_<class 'models_extra_attention_d.models_extra_attention'>_",""]
-    #full_model_list=["ckpoint_dense_500_final_50_4_190_<class 'models_full_model_d.models_full_model'>_"]
+    parser = argparse.ArgumentParser(prog="Trainer",
+                                    description="""This module trains a team of agents with the given model,
+                                    use build-on modules (e.x. ablation.py to auto-train)
+                                    """)
+    parser.add_argument("--saving_dir",action='store')
+    parser.add_argument("--ckpt_list",type=list)
+    parser.add_argument("--random_seed_list",type=list)
+    parser.add_argument("--num_nodes_list",type=list)
+
+    parser.add_argument("--model",action='store')
+    parser.add_argument("--num_nodes",type=int)
+    parser.add_argument("--num_agents",type=int)
+    parser.add_argument("--max_iters")
+    args = parser.parse_args()
     
-    
-    
-    third=["_ckpoint_dense_500_final_50_4_99_<class 'models_full_model_d.models_full_model'>_"]
-    ckpt_list=[]
-    for ckpt in no_dcbf_no_state_est:
-        for rs in random_seed_list:            
-            ckpt_list.append(ckpt+rs)
-    
+    empty_ckpt_list=[]
+    for ckpt in args.ckpt_list:
+        for rs in args.random_seed_list:            
+            empty_ckpt_list.append(ckpt+rs)
+    ckpt_list = empty_ckpt_list
 
     eval=algorithm_evaluator()
     
     
 
-    for ckpt in ckpt_list:
+    for ckpt in empty_ckpt_list:
         print(ckpt)
         seed=ckpt[-4:-1]
         for model in eval.model_list:
@@ -304,4 +311,4 @@ if __name__=="__main__":
                 model_class=model
         
         
-        eval.full_model(num_nodes=50,num_agents=4,ckpt=ckpt,model=model_class,log_name=f"{model.__name__}_data_collection",max_iters=20,seed=seed)
+        eval.full_model(num_nodes=args.num_nodes,num_agents=args.num_agents,ckpt=ckpt,model=model_class,log_name=f"{model.__name__}_data_collection",max_iters=args.max_iters,seed=seed)
