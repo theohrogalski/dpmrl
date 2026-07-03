@@ -23,15 +23,17 @@ A general list of tasks meant to be completed in future, in order of urgency.
 * Add assert functions to confirm functionality
 * Add hyperparemeter editing to collect further data
 * _Peripheral_: Add generator function for automatic parsing
+* Centralization function should batch observations 
 ### eval.py
 * Update logging format to be more descriptive
 * Update the format of the logger
 * Consider splitting evaluation into "classical algorithms" and "RL Algorithms"
 * _**Add centralized algorithm evaluation**_
 * Rationalize model selection
+* Add ability to evaluate algorithms from other papers 
 ### requirements.txt and alternatives
-* Find the proper, necessary packages
-* Use organizationt that incorporates both Nvidia and CPu for training/evaluation pipeline
+* Correct requirements.txt
+* Use device params that incorporates both Nvidia and CPu for training/evaluation pipeline
 
 ### README.md
 * Add detailed usage descriptions 

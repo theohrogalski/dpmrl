@@ -1,7 +1,7 @@
-from decentralized_graph_env import GraphEnv
+from custom_environment.decentralized_agents.decentralized_graph_env import GraphEnv
 import torch
 import os
-from models_full_model_d import models_full_model
+from custom_environment.decentralized_agents.model_variants.models_full_model_d import models_full_model
 from random import randint
 from torch.distributions import Categorical
 import argparse 

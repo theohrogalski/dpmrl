@@ -1,15 +1,15 @@
 import torch
-from decentralized_graph_env import GraphEnv
+from custom_environment.decentralized_agents.decentralized_graph_env import GraphEnv
 import random
 import ast
 import argparse
 from matplotlib import pyplot as plt
-from models_no_collision import models_no_collision
-from model_variants.models_extra_attention_d import models_extra_attention
-from model_variants.models_no_dcbf_d import models_no_dcbf
-from model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
-from models_full_model_d import models_full_model
-from model_variants.models_no_state_estimation import models_no_state_est
+from custom_environment.decentralized_agents.model_variants.models_no_collision import models_no_collision
+from custom_environment.decentralized_agents.model_variants.models_extra_attention_d import models_extra_attention
+from custom_environment.decentralized_agents.model_variants.models_no_dcbf_d import models_no_dcbf
+from custom_environment.decentralized_agents.model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
+from custom_environment.decentralized_agents.model_variants.models_full_model_d import models_full_model
+from custom_environment.decentralized_agents.model_variants.models_no_state_estimation import models_no_state_est
 import logging
 import networkx as nx
 from time import time
@@ -21,13 +21,13 @@ from datetime import datetime
 
 from torch.distributions import Categorical
 
-from neural_model import uncertainty_estimator as ue 
+from custom_environment.training.neural_model import uncertainty_estimator as ue 
 
 class algorithm_evaluator():
     def __init__(self):
         
         self.rand=random.randint(0,99999)
-        self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
+        #self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
         
         self.device= "cuda"
     def sit_on_nodes(self):
@@ -283,8 +283,8 @@ if __name__=="__main__":
     parser.add_argument("--ckpt_list",type=list)
     parser.add_argument("--random_seed_list",type=list)
     parser.add_argument("--num_nodes_list",type=list)
-
-    parser.add_argument("--model",action='store')
+    #a list of strings that turns into an object via ast.literal_eval()
+    parser.add_argument("--model_list",action='store',type=list)
     parser.add_argument("--num_nodes",type=int)
     parser.add_argument("--num_agents",type=int)
     parser.add_argument("--max_iters")
@@ -303,8 +303,8 @@ if __name__=="__main__":
     for ckpt in empty_ckpt_list:
         print(ckpt)
         seed=ckpt[-4:-1]
-        for model in eval.model_list:
-
+        for model in args.model_list :
+            model = ast.literal_eval(model)
             print(ckpt)
             if model.__name__ in ckpt:
                 print(f"{model.__name__} --- {ckpt}")

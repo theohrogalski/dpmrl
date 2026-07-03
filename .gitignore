@@ -1,38 +1,12 @@
-.venv
-rayrllib_test.py
-logname.csv
-logname.log
-aquarium.py
-graphic_creator.py
-*.csv
-*.zip
-ppo_env_test
-__pycache__
+# File Extensions to Ignore
 *.pyc
-arrayadd.py
-copied_aec_pmg.py
-aec_pmg.py
-csv_processing.py
-grid.html
-venv_wsl
-marl.py
-nxtest.py
-ppo.py
-arrayadd.py
-random_env_test.py
-rayrlib_env.py
-torchrlenv.py
-ppo_env_test.py
-ppo.py
-grap
-custom_environment_p.py
-*.pyc
-random_env_test.py
-ppo.py
 *.log
-venv
+*.html
+*.json
 
-*.png
-*.pt
-*.graphml
-Project_Data
+
+# Specific Files to Ignore
+venv
+.venv
+venv_wsl
+.vscode
