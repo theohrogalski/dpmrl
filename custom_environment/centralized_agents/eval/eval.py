@@ -1,5 +1,5 @@
 import torch
-from custom_environment.decentralized_agents.decentralized_graph_env import GraphEnv
+from custom_environment.decentralized_agents.env.decentralized_graph_env import GraphEnv
 import random
 import ast
 import argparse
@@ -21,7 +21,7 @@ from datetime import datetime
 
 from torch.distributions import Categorical
 
-from custom_environment.training.neural_model import uncertainty_estimator as ue 
+from custom_environment.decentralized_agents.training.decentralized_neural_model import uncertainty_estimator as ue 
 
 class algorithm_evaluator():
     def __init__(self):

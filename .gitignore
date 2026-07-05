@@ -10,3 +10,4 @@ venv
 .venv
 venv_wsl
 .vscode
+worklog.md

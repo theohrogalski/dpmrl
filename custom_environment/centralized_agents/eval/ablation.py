@@ -7,7 +7,7 @@ from custom_environment.decentralized_agents.model_variants.models_no_dcbf_d imp
 from custom_environment.decentralized_agents.model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbf_no_state_est
 from custom_environment.decentralized_agents.model_variants.models_full_model_d import models_full_model
 from custom_environment.decentralized_agents.model_variants.models_no_state_estimation import models_no_state_est
-from custom_environment.training.training import trainer 
+from custom_environment.decentralized_agents.training.decentralized_training import trainer 
 model_list = [models_no_dcbf,models_no_dcbsf_no_state_est,models_full_model,models_no_state_est,models_no_collision]
 model_list_2=[models_extra_attention]
 if __name__=="__main__":

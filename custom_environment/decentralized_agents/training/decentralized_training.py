@@ -1,4 +1,4 @@
-from custom_environment.decentralized_agents.decentralized_graph_env import GraphEnv
+from custom_environment.decentralized_agents.env.decentralized_graph_env import GraphEnv
 import torch
 import os
 from custom_environment.decentralized_agents.model_variants.models_full_model_d import models_full_model
@@ -206,7 +206,6 @@ class trainer:
             # Logging
             for agent in env.agents:
                 reward_history[agent].append(rewards[agent])
-                net_loss[agent].append()
             uncertainty_history.append(env.tot_unc)
 
 
