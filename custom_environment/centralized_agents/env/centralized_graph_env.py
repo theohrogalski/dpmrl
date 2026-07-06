@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from torch import tensor
 from random import randint
 import training.centralized_neural_model as ue
-
+from model_variants import centralized_full_model
 import torch
 from copy import copy
 from pettingzoo.utils import aec_to_parallel
@@ -79,22 +79,17 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self.num_moves = 0
         self.obs_dict = {node:torch.Tensor() for node in range(self.num_nodes)}
 
-        # 
         self.neural_model = ue.uncertainty_estimator(5,out_dim=1,hidden_dim=5,num_nodes=self.num_nodes,num_agents=self.num_agents,max_moves=max_moves)
         
-        self.model_path = "./saved_models" 
         self.max_uncertainty:int = 100
+        
         self.mmap = {agent:nx.Graph() for agent in self.possible_agents}
-        ###print(f"node uncertainty is {self.node_unc}")
+        
         self.rewards = {agent:0 for agent in self.agents}
         self.infos = {agent:{} for agent in self.agents}
-        #self.per_agent_covered = {agent:set() for agent in self.possible_agents}
         self.terminations = {agent:False for agent in self.agents}
         print(max_moves)
         self.max_moves=max_moves
-        # Linearly Decaying Parameters
-        self.d0= 1
-        self.d_k=0
         self.agent_to_no_targ={agent:0 for agent in self.possible_agents}
         starting_graph:nx.Graph = nx.Graph()
         
@@ -252,11 +247,9 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
 
         self.truncations = {agent:False for agent in self.agents}
         self.timestep = 0
-        # Resetting the graph to have no uncertainty values and accurate edge connections if necessary
+
         deg = self.graph.degree
-        degree_list = [
-        ]   
-        ##print(type(deg))
+        degree_list = []   
         for item in deg:
             degree_list.append(item)
         for node in range(self.num_nodes):

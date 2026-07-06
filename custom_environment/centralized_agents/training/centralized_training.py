@@ -5,6 +5,7 @@ import torch
 import importlib.util
 import sys
 sys.path.append("/home/rogal/dpmrl/custom_environment/centralized_agents/centralized_graph_env.py")
+
 import custom_environment.centralized_agents.env.centralized_graph_env as centralized_graph_env
 import centralized_neural_model as neural_model, centralized_agents
 
@@ -117,7 +118,7 @@ class dspmrl_trainer:
         logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
         logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
 
-        env = CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents)
+        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents)
         if torch.cuda.is_available():
             dev="cuda"
         else:
@@ -153,29 +154,18 @@ class dspmrl_trainer:
 
             log_prob={}
             values={}
-            unc_loss_dict = {}
-            # Deprecated step_data approach
 
-            #step_data={}
             
             for agent in env.agents:
                 logits, value, x_state, edges = obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position],position=env.agent_position)
                 unc_net = env.neural_model
                 unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves)
-                unc_loss_dict=unc_loss
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
                                
                 values=value
-                """step_data = {
-                    "log_prob":log_prob,
-                    "value": value,
-                    "prediction": unc_net(x_state, edges,env.num_moves).detach() 
-                    }"""
-
-            """for agent in env.agents:
-                logger.info(f"Action dict is {torch.max(actions)}")"""
+            
             obs, rewards, terminations, truncations, infos = env.step(actions)
 
             for agent in env.agents:
