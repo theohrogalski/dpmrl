@@ -25,10 +25,6 @@ class uncertainty_estimator(Module):
         self.optimizer = torch.optim.Adam(self.parameters(),lr=1e-3)
         self.loss_f = torch.nn.MSELoss()
         self.current_loss=0
-    # WIP
-    def make_graph(self,loss_data)->None:
-        plt.plot(loss_data)
-        plt.title(f"loss_agent_{self.agent_name}_")
 
     def forward(self,x,edge_index,move_num):
         #print(type(edge_index))
@@ -59,7 +55,6 @@ class uncertainty_estimator(Module):
             _type_: _description_
         """
         if move_num%(self.max_moves-1)==0:
-            self.make_graph(self.loss_data)
             self.episodes+=1
             self.loss_data=[]
         # Ensure the model is in training mode

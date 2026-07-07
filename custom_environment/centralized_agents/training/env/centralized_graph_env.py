@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from torch import tensor
 from random import randint
-import training.centralized_neural_model as ue
+import centralized_neural_model as ue
 from model_variants import centralized_full_model
 import torch
 from copy import copy
@@ -41,7 +41,8 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         "name": "graph_env_v0",
         "is_parallelizable":True
         }
-        self.visit_list = [0]*self.num_nodes
+        print(f"type of self num nodes is {type(self.num_nodes)}")
+        self.visit_list = [0]*int(self.num_nodes)
         self.longest_time_without_a_visit=(0,0)	
 
         if torch.cuda.is_available():
@@ -349,26 +350,16 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
                 self.time_spent_on_target[agent]+=0.5
             else:
                 self.time_spent_on_target[agent]-=self.num_moves/self.max_moves*0.05
-            #if self.last_state[agent] != self.agent_position[agent]:
-             #   pos_entropy=0.05
-            # Get the uncertainty difference
-            #unc_diff = self.agent_to_two_recent_unc[agent][1]-self.agent_to_two_recent_unc[agent][0]
-            # Old state = New state 
-            #unc_on_node = self.graph.nodes[self.agent_position[agent]]["uncertainty"]/100
             self.agent_to_two_recent_unc[agent][1]=self.agent_to_two_recent_unc[agent][0]
             
             long_term=0
             if self.num_moves==self.max_moves-1 and self.num_epochs!=0:
                 long_term=(self.avg_over_last_uncertainties[agent]-self.tot_unc_agent[agent])
-            #print(long_term)
             if self.graph.nodes[self.agent_position[agent]]["uncertainty"]==1 and self.graph.nodes[self.agent_position[agent]]["uncertainty"]>0:
                 self.momentum[agent]+=1
             else:
                 self.momentum[agent]-=1
             rewards[agent] = collision*0.1 + long_term*0.05 + self.momentum[agent]*0.05
-
-            
-            #print(f"{agent} {rewards[agent]}")
 
         self.truncations = {
             agent: self.num_moves >= self.max_moves for agent in self.agents
@@ -377,7 +368,6 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
             if item==True:
                 print("terminations reached, error!")
         self.num_moves+=1
-        #print(self.num_moves)
         """if self.render_mode == "human":
             self.render()"""
         
@@ -392,14 +382,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         # Every agent sees its mental map
         return self.mental_map[agent]
     def render(self):
-       
-       # plt.clf()
-        #print(self.agent_position)
-       # plt.subplot(2,1,1)
-        
-        #nx.draw_networkx(self.graph,pos=self.graph,node_color=['red' if node in list(self.agent_position.values()) else 'skyblue' for node in self.graph.nodes()])
-        
-        ###print(self.ly)
+
         if self.num_moves%50==0:
             plt.subplot(2,1,2)
             plt.pause(1)

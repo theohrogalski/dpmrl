@@ -1,14 +1,8 @@
-from custom_environment.centralized_agents.env.centralized_graph_env import CentralizedGraphEnv
 import torch
-
-# Importing the model
-import importlib.util
 import sys
-sys.path.append("/home/rogal/dpmrl/custom_environment/centralized_agents/centralized_graph_env.py")
-
-import custom_environment.centralized_agents.env.centralized_graph_env as centralized_graph_env
-import centralized_neural_model as neural_model, centralized_agents
-
+sys.path.append("/home/rogal/dpmrl/custom_environment/centralized_agents/env/centralized_graph_env.py")
+from env import centralized_graph_env
+from model_variants.centralized_full_model import centralized_full_model
 from random import randint
 from torch.distributions import Categorical
 import argparse 
@@ -22,7 +16,7 @@ from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
 import random
 
-class dspmrl_trainer:
+class dpmrl_trainer:
 
     def __init__(self,model,max_iters:int,saving_dir:pathlib.Path,training_id:str=str(random.randint(1,1000)),max_moves:int=1):
         self.training_id = training_id
@@ -115,9 +109,8 @@ class dspmrl_trainer:
     def train_loop(self,num_nodes,num_agents,random_seed):
         # Configuring the logger
         
-        logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
-        logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
-
+        logging.basicConfig(filename=f"{self.model.__name__}_{num_nodes}_{num_agents}.log", level=logging.INFO)
+        logging.info("started logging...")
         env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents)
         if torch.cuda.is_available():
             dev="cuda"
@@ -131,7 +124,7 @@ class dspmrl_trainer:
         critic_loss_dict:dict = {}
         reward_total = 0
         critic_loss_dict = {}
-        net_loss:list = [] 
+        self.net_loss:list = [] 
         max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
@@ -140,24 +133,26 @@ class dspmrl_trainer:
         while env.agents and max_iters>num_iters:
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
                 self.save_marl_checkpoint(episode=env.num_moves,obs_net=obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
-                self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=net_loss)
+                self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=self.net_loss)
                 env.reset()
                 
                 uncertainty_history = []
                 reward_history:list = [] 
                 num_iters+=1
-                logger.info(f"Iteration Changing to {num_iters}")
+                logging.info(f"Iteration Changing to {num_iters}")
 
             actions={}
-
-            #step_data={}
 
             log_prob={}
             values={}
 
             
             for agent in env.agents:
-                logits, value, x_state, edges = obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position],position=env.agent_position)
+                #DEBUG 
+                print(env.agent_position)
+                print(env.action_mask_to_node)
+                # /DEBUG
+                logits, value, x_state, edges = obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 unc_net = env.neural_model
                 unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves)
 
@@ -169,7 +164,7 @@ class dspmrl_trainer:
             obs, rewards, terminations, truncations, infos = env.step(actions)
 
             for agent in env.agents:
-                reward = torch.tensor([rewards], device=dev)
+                reward = torch.tensor([rewards[agent]], device=dev)
 
                 _,next_val,_,_ = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position], position =env.agent_position)
                 value = values
@@ -181,14 +176,14 @@ class dspmrl_trainer:
                 total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
 
                 optimizers.zero_grad()
-                logger.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value[agent].item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
+                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value[agent].item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
                 total_loss.backward()
                 optimizers.step()
                 
             # Logging
             reward_history.append(rewards)
 
-            net_loss.append(float(env.neural_model.loss_data[-1]))
+            self.net_loss.append(float(env.neural_model.loss_data[-1]))
             uncertainty_history.append(env.tot_unc)
 
 
@@ -199,25 +194,31 @@ if __name__=="__main__":
                                     """)
     parser.add_argument("--training_id",type=str)
 
-    parser.add_argument("--seed_list",type=list)
-    parser.add_argument("--num_agents_list",type=list)
-    parser.add_argument("--num_nodes_list",type=list)
+    parser.add_argument("--seed",type=int)
+    parser.add_argument("--num_agents",type=int)
+    parser.add_argument("--num_nodes",type=int)
 
-    parser.add_argument("--model",action='store')
+    parser.add_argument("--model",type=str,default="centralized_full_model")
     parser.add_argument("--max_iters",type=int)
     parser.add_argument("--max_moves",type=int)
-    parser.add_argument("--max_iters")
 
     # Saving directory
     saving_dir = pathlib.Path.cwd().parent.parent / "saved_data" / "checkpoints"
 
-
     args = parser.parse_args()
-    train_obj=dspmrl_trainer(max_iters=args.max_iters,model=ast.literal_eval(args.model), training_id=args.training_id, max_moves=args.max_moves, saving_dir=saving_dir)
-    nodes_for_data=args.num_nodes_list
-    num_agents_for_testing=args.num_agents_list
-    for nn in nodes_for_data:
-        for ag in num_agents_for_testing:
-            for random_seed in args.seed_list:
+    
+    model_string:str = args.model
 
-                train_obj.train_loop(num_nodes=nn,num_agents=ag,random_seed=random_seed)
+    print(f"Model string is {model_string}")
+
+    model = globals().get(model_string)
+    
+    assert(type(model) != str), "Model type is string! Bad ast literal eval on line 211"
+    
+    train_obj=dpmrl_trainer(max_iters=args.max_iters,model = model, training_id=args.training_id, max_moves=args.max_moves, saving_dir=saving_dir)
+    
+    nodes_for_data=args.num_nodes
+    
+    num_agents_for_testing=args.num_agents
+    
+    train_obj.train_loop(num_nodes = args.num_nodes, num_agents = args.num_agents, random_seed = args.seed)
