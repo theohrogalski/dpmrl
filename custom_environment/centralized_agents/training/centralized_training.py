@@ -118,11 +118,13 @@ class dpmrl_trainer:
             dev="cpu"
         # Single observation processing network 
         obs_net = self.model(env.graph.number_of_nodes())
-       
+
         optimizers = torch.optim.Adam(obs_net.parameters())
         gamma = 0.99
         critic_loss_dict:dict = {}
         reward_total = 0
+        reward_history:dict = {agent:[] for agent in env.possible_agents}
+
         critic_loss_dict = {}
         self.net_loss:list = [] 
         max_iters=self.max_iters
@@ -134,10 +136,9 @@ class dpmrl_trainer:
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
                 self.save_marl_checkpoint(episode=env.num_moves,obs_net=obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
                 self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=self.net_loss)
-                env.reset()
-                
+                env.reset()                
                 uncertainty_history = []
-                reward_history:list = [] 
+
                 num_iters+=1
                 logging.info(f"Iteration Changing to {num_iters}")
 
@@ -149,8 +150,10 @@ class dpmrl_trainer:
             
             for agent in env.agents:
                 #DEBUG 
-                print(env.agent_position)
-                print(env.action_mask_to_node)
+                #print(env.agent_position)
+                #print(env.action_mask_to_node)
+                #print(f"type of agent is {env.agent_position[agent]}")
+
                 # /DEBUG
                 logits, value, x_state, edges = obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 unc_net = env.neural_model
@@ -158,30 +161,34 @@ class dpmrl_trainer:
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
-                               
-                values=value
-            
+                #DEBUG
+                #print(f"Actions for {agent} are {actions[agent]}")
+                #/DEBUG
+                values[agent]=value
+
             obs, rewards, terminations, truncations, infos = env.step(actions)
 
             for agent in env.agents:
                 reward = torch.tensor([rewards[agent]], device=dev)
+                value = values[agent]
 
-                _,next_val,_,_ = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position], position =env.agent_position)
-                value = values
-                log_prob = actions
+                _,next_val,_,_ = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
                 if env.step==env.max_moves-1:
                     done=1
                 else:
                     done=0
+
+                log_prob = dist.probs[actions[agent]].item()
                 total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
+                value = values[agent]
 
                 optimizers.zero_grad()
-                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value[agent].item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
+                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
                 total_loss.backward()
                 optimizers.step()
                 
             # Logging
-            reward_history.append(rewards)
+            reward_history[agent].append(rewards)
 
             self.net_loss.append(float(env.neural_model.loss_data[-1]))
             uncertainty_history.append(env.tot_unc)

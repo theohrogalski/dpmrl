@@ -9,8 +9,7 @@ class centralized_full_model(torch.nn.Module):
     def get_safe_action_mask(self,mask:torch.Tensor, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
             
             threshold = num_moves
-            assert neighbors[position]==1
-                # 1. Current Safety h(x_t)
+            
             
             predicted_u_current = unc_net(x_state, edge_index,num_moves)
             h_t = threshold - torch.max(predicted_u_current)

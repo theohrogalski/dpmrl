@@ -11,12 +11,11 @@ class models_no_collision(torch.nn.Module):
     Returns a binary mask [50] where 1.0 = Mathematically Safe, 0.0 = Forbidden.
     """
         x_state=x_state.tolist()
-        #print(x_state)
-        threshold=num_moves
-        #assert neighbors[position]==1
+
         with torch.no_grad():
             # 1. Current Safety h(x_t)
             buffer_at_least_one_one=0
+            print
             for node in neighbors:
                 if x_state[node][1]==1:
                     mask[node]=0
