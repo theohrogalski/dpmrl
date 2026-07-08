@@ -1,16 +1,14 @@
 import torch
-from custom_environment.decentralized_agents.env.decentralized_graph_env import GraphEnv
 import random
 import ast
 import argparse
 from matplotlib import pyplot as plt
-from custom_environment.decentralized_agents.model_variants.models_no_collision import models_no_collision
-from custom_environment.decentralized_agents.model_variants.models_extra_attention_d import models_extra_attention
-from custom_environment.decentralized_agents.model_variants.models_no_dcbf_d import models_no_dcbf
-from custom_environment.decentralized_agents.model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
-from custom_environment.decentralized_agents.model_variants.models_full_model_d import models_full_model
-from custom_environment.decentralized_agents.model_variants.models_no_state_estimation import models_no_state_est
+from model_variants import centralized_full_model
 import logging
+from model_variants.centralized_full_model import models_full_model
+from env import centralized_graph_env
+
+
 import networkx as nx
 from time import time
 import os
@@ -95,7 +93,7 @@ class algorithm_evaluator():
         logging.info(f"Beginning eval. loop for seed {seed},max. iters:{max_iters}, num nodes: {num_nodes}, num agents: {num_agents}")    
         logging.info("num_moves, agent, reward, action, uncertainty, occ_nodes")
 
-        env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents,max_moves=500)
+        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents,max_moves=500)
         "Evaluation for a pre-determined checkpoint for the full algorithm. Uses the self.ckpt as the path for loading models."
         check_dict  = torch.load(f"./checkpoints/{ckpt}.pt")
 
@@ -304,7 +302,7 @@ if __name__=="__main__":
         print(ckpt)
         seed=ckpt[-4:-1]
         for model in args.model_list :
-            model = ast.literal_eval(model)
+            model = globals.get(model)
             print(ckpt)
             if model.__name__ in ckpt:
                 print(f"{model.__name__} --- {ckpt}")
