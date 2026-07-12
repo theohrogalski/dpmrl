@@ -3,8 +3,6 @@ _Theodore Rogalski_
 
 This repository contains the tools necesessary for training, testing and customizing teams of decentralized agents for the persistent monitoring problem on networks. 
 
-Intended for use on NVidia CUDA enabled-hardware.
-
 ## Features
 * Custom network environment creation for RL training (stored in .graphml files)
 * Fully decentralized teams of an arbitrary number of agents that learn using deep reinforcement learning
