@@ -2,13 +2,10 @@ import torch
 import sys
 sys.path.append("/home/rogal/dpmrl/custom_environment/centralized_agents/env/centralized_graph_env.py")
 from env import centralized_graph_env
-from model_variants.centralized_full_model import centralized_full_model
 from random import randint
 from torch.distributions import Categorical
 import argparse 
-import ast
-import importlib
-import os
+import networkx
 import pathlib
 import logging
 import matplotlib
@@ -25,8 +22,7 @@ class dpmrl_trainer:
         self.saving_dir:pathlib.Path=saving_dir
         self.max_moves=max_moves
         self.model = model
-        
-        
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
     def save_marl_checkpoint(self,episode, obs_net, unc_net,model, optimizer,epoch, training_id:str,ag_num=0, num_nodes=0,random_seed=0):
         """_save_marl_checkpoint saves a richly named .pt file containing a trained model at a certain point, including all relevant weights: each of the _
@@ -51,11 +47,8 @@ class dpmrl_trainer:
             'opt_state_dict': optimizer.state_dict() ,
         }
         # WIP: Change the naming convention 
-        path = self.saving_dir / f"checkpoint_model_{model.__name__}_ep_{episode}_seed_{random_seed}_trainingid_{training_id}.pt"
-        torch.save(checkpoint, path)
-        
-        torch.save(checkpoint, f"{path}latest.pt")
-    
+        torch.save(checkpoint, f"""./checkpoints/checkpoint_model_{model.__name__}_ep_{episode}_seed_{random_seed}_trainingid_{training_id}.pt""")
+            
 
     cur_length_list = []
     def diagnostic_plots(self,step,reward_history,epoch,uncertainty_history,neural_net_history):
@@ -82,7 +75,8 @@ class dpmrl_trainer:
             axes.set_xlabel("Timesteps")
             axes.set_ylabel("Reward per agent")
             axes.set_title(f"Reward History: agent_{i}")
-            axes.plot(reward_history)
+            print(type(reward_history[f"agent_{i}"]))
+            axes.plot(reward_history[f"agent_{i}"])
             i+=1
 
 
@@ -109,17 +103,18 @@ class dpmrl_trainer:
     def train_loop(self,num_nodes,num_agents,random_seed):
         # Configuring the logger
         
-        logging.basicConfig(filename=f"{self.model.__name__}_{num_nodes}_{num_agents}.log", level=logging.INFO)
+        logging.basicConfig(filename=f"{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log", level=logging.INFO)
         logging.info("started logging...")
-        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents)
+        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents,seed=random_seed,render_mode="human",max_moves=self.max_moves,graph_selection=0)
         if torch.cuda.is_available():
             dev="cuda"
         else:
             dev="cpu"
         # Single observation processing network 
-        obs_net = self.model(env.graph.number_of_nodes())
+        self.obs_net = self.model(env.graph.number_of_nodes())
+        self.obs_net = self.obs_net.to(self.device)
 
-        optimizers = torch.optim.Adam(obs_net.parameters())
+        optimizers = torch.optim.Adam(self.obs_net.parameters())
         gamma = 0.99
         critic_loss_dict:dict = {}
         reward_total = 0
@@ -130,12 +125,13 @@ class dpmrl_trainer:
         max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
-
+        x_state = networkx.Graph()
 
         while env.agents and max_iters>num_iters:
-            if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
-                self.save_marl_checkpoint(episode=env.num_moves,obs_net=obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
-                self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=self.net_loss)
+            if env.num_moves % env.max_moves == 0 and env.num_moves !=0:
+                print("saving checkpoint")
+                self.save_marl_checkpoint(episode=num_iters,obs_net = self.obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
+                #self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=self.net_loss)
                 env.reset()                
                 uncertainty_history = []
 
@@ -155,9 +151,12 @@ class dpmrl_trainer:
                 #print(f"type of agent is {env.agent_position[agent]}")
 
                 # /DEBUG
-                logits, value, x_state, edges = obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
-                unc_net = env.neural_model
-                unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves)
+                last_state = x_state
+                logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
+                
+                unc_net = env.neural_model()
+                
+                unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves,last_state=last_state)
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
@@ -172,7 +171,7 @@ class dpmrl_trainer:
                 reward = torch.tensor([rewards[agent]], device=dev)
                 value = values[agent]
 
-                _,next_val,_,_ = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
+                _,next_val,_,_ = self.obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
                 if env.step==env.max_moves-1:
                     done=1
                 else:
@@ -210,7 +209,7 @@ if __name__=="__main__":
     parser.add_argument("--max_moves",type=int)
 
     # Saving directory
-    saving_dir = pathlib.Path.cwd().parent.parent / "saved_data" / "checkpoints"
+    saving_dir = pathlib.Path.cwd()/ "checkpoints"
 
     args = parser.parse_args()
     

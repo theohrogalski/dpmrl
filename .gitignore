@@ -3,7 +3,10 @@
 *.log
 *.html
 *.json
-
+*.pt
+*.csv
+*.png
+*.zip
 
 # Specific Files to Ignore
 venv

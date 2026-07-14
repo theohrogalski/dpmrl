@@ -1,21 +1,30 @@
+import asyncio
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import networkx as nx
 import random
+import os
+import gpytorch 
+import wandb
 from torch_geometric.utils import from_networkx
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from torch import tensor
 from random import randint
-from centralized_neural_model import uncertainty_estimator as ue
+import centralized_neural_model as ue
+from model_variants import centralized_full_model
 import torch
+from copy import copy
 import pettingzoo
 import functools
 import itertools
+from pettingzoo.utils.agent_selector import agent_selector
+import time
+###print(plt.get_backend())
 
 class CentralizedGraphEnv(pettingzoo.ParallelEnv):
-    def __init__(self, num_nodes=100, num_agents=15, seed=1,render_mode="human", graph_selection=0,max_moves=500):
+    def __init__(self, num_nodes, num_agents, seed,render_mode, graph_selection,max_moves):
         self.seed=seed
         self.occupied_targets=0
         self.tot_unc =0
@@ -27,7 +36,8 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         "name": "graph_env_v0",
         "is_parallelizable":True
         }
-        self.visit_list = [0]*self.num_nodes
+        print(f"type of self num nodes is {type(self.num_nodes)}")
+        self.visit_list = [0]*int(self.num_nodes)
         self.longest_time_without_a_visit=(0,0)	
 
         if torch.cuda.is_available():
@@ -37,7 +47,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self.render_mode=render_mode
         self.random_num = randint(0,10000)
         self.np_random_seed = int(np.random.randint(1, 10 + 1))
-        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"./graphs/for_testing/node_50")
+        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"{self.num_nodes}_nodes")
         self.pos=nx.spring_layout(self.graph)
         ##print(f"Before: {list(self.graph.nodes)} | Type: {type(list(self.graph.nodes)[0])}")
         
@@ -109,6 +119,8 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         #print(self.graph.nodes)
         self.max_buffer=10
         self.neighbors_iter = {node:list(self.graph.neighbors(node)) for node in self.graph.nodes}
+        print(f"number of nodes is {self.graph.number_of_nodes()}")
+        
         self.action_mask_to_node = {node:[0]*(num_nodes) for node in self.graph}
         """for node in self.graph.nodes:
             ##print(len(list(self.graph.neighbors(n=node))))"""
@@ -120,6 +132,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
                 ###print(index)
                 ###print(self.neighbors_iter[node])
                 if ((index) in (self.neighbors_iter[node])) or index==int(node) :
+                    
                     #print(index)
                     self.action_mask_to_node[node][index] = 1
                 
@@ -133,9 +146,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self.tot_unc_agent={agent:0 for agent in self.possible_agents}
         self.avg_over_last_uncertainties={agent:0.0 for agent in self.possible_agents}
     def select_graph(self, load_param:int, loaded_graphml_name:str, output_name:str="default_name",):
-        """
-        Docstring for select_graph
-        
+        """        
         :param load_param: 1 for loading a graph from a graphml file, 0 for using the create custom nx graph method
         :type load_param: int
         :param loaded_graphml_name: Name of the desired loaded graphml file, eg "example" <-> example.graphml
@@ -143,8 +154,8 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         :param output_name: The output name of the created graph if load_param is 0
         :type output_name: str
         """
-        if load_param == 1 :
-            return nx.read_graphml(f"{loaded_graphml_name}.graphml")
+        if load_param==1:
+            return nx.read_graphml(f"./env/graphs/{loaded_graphml_name}.graphml")
         elif load_param == 0 :
             self.create_custom_nx_graph(output_name=f"{output_name}")
             
@@ -153,9 +164,9 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
             ##print("empty graph being used\n")
             return nx.Graph()
     
-    def create_custom_nx_graph(self, num_nodes:int, output_name:str="random_output_graph", random_chance_param_target:int=20, random_chance_param_edge:int=20) -> None:
+    def create_custom_nx_graph(self, output_name:str="random_output_graph", random_chance_param_target:int=20, random_chance_param_edge:int=20) -> None:
         r_graph = nx.Graph()
-        for i in range(num_nodes):
+        for i in range(self.num_nodes):
             r_graph.add_node(int(i))
 
             r_graph.nodes[i]["uncertainty"] = 0
@@ -373,5 +384,4 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
             plt.pause(1)
 if __name__ == "__main__":
     env = CentralizedGraphEnv()
-    env.create_custom_nx_graph(output_name = "200_nodes_",num_nodes = 200, random_chance_param_target = 32)
-    env.create_custom_nx_graph(output_name = "100_nodes",num_nodes = 100, random_chance_param_target = 16)
+    env.create_custom_nx_graph(output_name="int_name_graph")

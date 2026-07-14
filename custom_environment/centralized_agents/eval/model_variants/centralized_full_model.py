@@ -23,8 +23,8 @@ class models_full_model(torch.nn.Module):
                     safe_mask[node_idx] = 1
             mask=torch.tensor(mask)*safe_mask
             if mask.sum() == 0:
-            min_val=0
-            min_node=0
+                min_val=0
+                min_node=0
             for node in range(50):
                 if node in neighbors:
                     if (threshold - predicted_u_current[node]) < min_val:

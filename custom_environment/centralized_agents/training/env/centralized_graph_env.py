@@ -16,15 +16,10 @@ import centralized_neural_model as ue
 from model_variants import centralized_full_model
 import torch
 from copy import copy
-from pettingzoo.utils import aec_to_parallel
-import supersuit as ss
-from torch.nn.functional import scaled_dot_product_attention
-from pettingzoo.test import api_test
 import pettingzoo
 import functools
 import itertools
 from pettingzoo.utils.agent_selector import agent_selector
-from pettingzoo.utils import wrappers
 import time
 ###print(plt.get_backend())
 
@@ -52,7 +47,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self.render_mode=render_mode
         self.random_num = randint(0,10000)
         self.np_random_seed = int(np.random.randint(1, 10 + 1))
-        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"./graphs/for_testing/node_{self.num_nodes}")
+        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"./graphs/for_testing/{self.num_nodes}_nodes")
         self.pos=nx.spring_layout(self.graph)
         ##print(f"Before: {list(self.graph.nodes)} | Type: {type(list(self.graph.nodes)[0])}")
         
@@ -79,9 +74,9 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self._cumulative_rewards = {agent:0 for agent in self.agents}
         self.num_moves = 0
         self.obs_dict = {node:torch.Tensor() for node in range(self.num_nodes)}
-
+    
         self.neural_model = ue.uncertainty_estimator(5,out_dim=1,hidden_dim=5,num_nodes=self.num_nodes,num_agents=self.num_agents,max_moves=max_moves)
-        
+        self.neural_model = self.neural_model.to(self.device)
         self.max_uncertainty:int = 100
         
         self.mmap = {agent:nx.Graph() for agent in self.possible_agents}

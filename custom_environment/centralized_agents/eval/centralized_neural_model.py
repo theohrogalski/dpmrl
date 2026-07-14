@@ -3,7 +3,7 @@ from torch.nn import Module
 import networkx as nx
 from torch_geometric.nn import GCNConv
 import matplotlib.pyplot as plt
-class uncertainty_estimator(Module) :
+class uncertainty_estimator(Module):
     """_This module is the same as the decentralized neural state estimator, except that it
     takes in the observations from every agent, not just one._
     """
@@ -11,10 +11,10 @@ class uncertainty_estimator(Module) :
         super().__init__()
         
         if torch.cuda.is_available():
+            print("cuda2")
             self.device="cuda"
         else: 
             self.device="cpu"
-        print(f"Self Device is {self.device}")
         self.episodes=0
         self.num_nodes=num_nodes
         self.max_moves=max_moves
@@ -39,7 +39,7 @@ class uncertainty_estimator(Module) :
         #print(f"shape of x here iss {x.shape}")
         return x
     
-    def update_estimator(self, last_x, x, edge_index,move_num):
+    def update_estimator(self, x, edge_index,move_num):
         """_This function takes updates the estimation model via taking in graph data, 
         using it to run a forward pass of the model, and comparing the result to the 
         actual data. Essentially: error = |G|^-1 * sum((x_t-f(x)_t)^n), where x is the graph data
@@ -54,12 +54,15 @@ class uncertainty_estimator(Module) :
         Returns:
             _type_: _description_
         """
-        x=x.to(self.device)
-        last_x=last_x.to(self.device)
-
-
+        if move_num%(self.max_moves-1)==0:
+            self.episodes+=1
+            self.loss_data=[]
+        # Ensure the model is in training mode
         self.train() 
-        prediction = self.forward(last_x, edge_index,move_num)
+        
+        prediction = self.forward(x, edge_index,move_num)
+        target = x.detach() 
+    
         target = target[:,0].reshape(self.num_nodes,1)
      
         loss = self.loss_f(prediction, target)

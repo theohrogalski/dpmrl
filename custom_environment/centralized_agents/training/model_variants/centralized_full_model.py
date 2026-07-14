@@ -42,8 +42,8 @@ class centralized_full_model(torch.nn.Module):
         self.graph_attention = GAT(in_channels=6, hidden_channels=8, num_layers=2, out_channels=5)
         self.multihead = nn.MultiheadAttention(embed_dim=5, num_heads=1)
         self.transform_two = TransformerConv(5, 5, heads=1)
-        self.actor = nn.Linear(self.number_of_nodes*5,1)
-        self.critic = nn.Linear(in_features=self.number_of_nodes*3, out_features=1)
+        self.actor = nn.Sequential(nn.Linear(self.number_of_nodes*5,1),nn.GELU(),nn.Linear(self.number_of_nodes*5,1), nn.GELU())
+        self.critic = nn.Sequential(nn.Linear(self.number_of_nodes*5,1),nn.GELU(),nn.Linear(self.number_of_nodes*5,1), nn.GELU())
 
     def compute_pyg_laplacian_features(self, data, k=2):
         edge_index, _ = get_laplacian(data.edge_index, normalization='sym', num_nodes=self.number_of_nodes)
