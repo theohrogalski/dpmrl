@@ -12,6 +12,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
 import random
+from model_variants.centralized_full_model import centralized_full_model
 
 class dpmrl_trainer:
 
@@ -22,6 +23,7 @@ class dpmrl_trainer:
         self.saving_dir:pathlib.Path=saving_dir
         self.max_moves=max_moves
         self.model = model
+        print(f"self model is {self.model}")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
     def save_marl_checkpoint(self,episode, obs_net, unc_net,model, optimizer,epoch, training_id:str,ag_num=0, num_nodes=0,random_seed=0):
@@ -94,11 +96,9 @@ class dpmrl_trainer:
         target = reward + (gamma * next_value * mask)
         advantage = target - value
         actor_loss = - log_prob * advantage
-        critic_loss = mse_loss(torch.Tensor([value]), torch.Tensor([target]),reduction='mean')
+        critic_loss = mse_loss(value, target)
         total_loss = actor_loss + (0.5 * critic_loss)
-        assert total_loss.shape == torch.Size([1])
         return total_loss
-
    
     def train_loop(self,num_nodes,num_agents,random_seed):
         # Configuring the logger
@@ -113,7 +113,8 @@ class dpmrl_trainer:
         # Single observation processing network 
         self.obs_net = self.model(env.graph.number_of_nodes())
         self.obs_net = self.obs_net.to(self.device)
-
+        x_state = None
+        last_state = None
         optimizers = torch.optim.Adam(self.obs_net.parameters())
         gamma = 0.99
         critic_loss_dict:dict = {}
@@ -125,7 +126,6 @@ class dpmrl_trainer:
         max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
-        x_state = networkx.Graph()
 
         while env.agents and max_iters>num_iters:
             if env.num_moves % env.max_moves == 0 and env.num_moves !=0:
@@ -151,15 +151,21 @@ class dpmrl_trainer:
                 #print(f"type of agent is {env.agent_position[agent]}")
 
                 # /DEBUG
-                last_state = x_state
+            
+                if x_state is not None:
+                    last_state = x_state
                 logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
-                
-                unc_net = env.neural_model()
-                
-                unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves,last_state=last_state)
-
+                if last_state is None:
+                    last_state = x_state
+                assert x_state.shape == torch.Size([50,3])
+                assert last_state.shape == torch.Size([50,3])
+                unc_loss = env.neural_model.update_estimator(last_x=last_state, x = x_state.detach(), edge_index = edges,move_num=env.num_moves)
+                print(f"logit shape is {logits.shape}")
+                assert logits.shape == torch.Size([50])
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
+
+                print(f"action shape is {actions[agent].shape}")
                 #DEBUG
                 #print(f"Actions for {agent} are {actions[agent]}")
                 #/DEBUG
@@ -212,15 +218,11 @@ if __name__=="__main__":
     saving_dir = pathlib.Path.cwd()/ "checkpoints"
 
     args = parser.parse_args()
-    
+    print(args.model)
     model_string:str = args.model
 
-    print(f"Model string is {model_string}")
-
     model = globals().get(model_string)
-    
-    assert(type(model) != str), "Model type is string! Bad ast literal eval on line 211"
-    
+    print(model)
     train_obj=dpmrl_trainer(max_iters=args.max_iters,model = model, training_id=args.training_id, max_moves=args.max_moves, saving_dir=saving_dir)
     
     nodes_for_data=args.num_nodes

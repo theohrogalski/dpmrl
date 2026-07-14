@@ -54,9 +54,6 @@ class uncertainty_estimator(Module):
         Returns:
             _type_: _description_
         """
-        if move_num%(self.max_moves-1)==0:
-            self.episodes+=1
-            self.loss_data=[]
         # Ensure the model is in training mode
         self.train() 
         
@@ -64,10 +61,12 @@ class uncertainty_estimator(Module):
         target = x.detach() 
     
         target = target[:,0].reshape(self.num_nodes,1)
-     
+        print(f"target shape is {target.shape}")
+        print(f"pred shape is {prediction.shape}")
         loss = self.loss_f(prediction, target)
         self.loss_data.append(loss.item())
         self.optimizer.zero_grad()
+        
         loss.backward()
         self.optimizer.step()
         

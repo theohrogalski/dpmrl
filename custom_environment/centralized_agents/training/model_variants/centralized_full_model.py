@@ -7,11 +7,11 @@ import networkx as nx
 class centralized_full_model(torch.nn.Module):
     
     def get_safe_action_mask(self,mask:torch.Tensor, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
-            
+            print("getting safe action mask")
             threshold = num_moves
             
             
-            predicted_u_current = unc_net(x_state, edge_index,num_moves)
+            predicted_u_current = unc_net(x_state[:,:3], edge_index,num_moves)
             h_t = threshold - torch.max(predicted_u_current)
             lower_bound = (1 - eta) * h_t
             safe_mask = torch.zeros(self.number_of_nodes)
@@ -42,8 +42,8 @@ class centralized_full_model(torch.nn.Module):
         self.graph_attention = GAT(in_channels=6, hidden_channels=8, num_layers=2, out_channels=5)
         self.multihead = nn.MultiheadAttention(embed_dim=5, num_heads=1)
         self.transform_two = TransformerConv(5, 5, heads=1)
-        self.actor = nn.Sequential(nn.Linear(self.number_of_nodes*5,1),nn.GELU(),nn.Linear(self.number_of_nodes*5,1), nn.GELU())
-        self.critic = nn.Sequential(nn.Linear(self.number_of_nodes*5,1),nn.GELU(),nn.Linear(self.number_of_nodes*5,1), nn.GELU())
+        self.actor = nn.Sequential(nn.Linear(5,5), nn.GELU(), nn.Linear(5,5), nn.GELU(), nn.Linear(5,1))
+        self.critic = nn.Sequential(nn.Linear(self.number_of_nodes*3,5),nn.GELU(),nn.Linear(5,self.number_of_nodes*5), nn.GELU(), nn.Linear(self.number_of_nodes*5,1))
 
     def compute_pyg_laplacian_features(self, data, k=2):
         edge_index, _ = get_laplacian(data.edge_index, normalization='sym', num_nodes=self.number_of_nodes)
@@ -60,12 +60,11 @@ class centralized_full_model(torch.nn.Module):
         data_x = (data.x).to(self.device).float()
         
         data_x = data_x.flatten()
-        
         value = self.critic(data_x)
         
-        x_combined = torch.cat([data.x, lap_ev], dim=1) # [50, 5]
-        
-        uncertainty_prediction = unc_net(data.x, data.edge_index,move_num=num_moves) # [50, 1]
+        x_combined = torch.cat([data.x, lap_ev], dim=1) 
+        print(f"before first unc prediction, {data.x.shape}")
+        uncertainty_prediction = unc_net(data.x, data.edge_index,move_num=num_moves) 
         
         uncertainty_prediction = uncertainty_prediction.to(self.device)
         
@@ -80,11 +79,12 @@ class centralized_full_model(torch.nn.Module):
         edge_index = edge_index.to(self.device)
         
         x = self.graph_attention(x_enriched, edge_index)
-        
-        logits = self.actor(x.flatten())
-        
+        logits = self.actor(x).squeeze(-1)
+        print(f"get safe action mask x data shape is {x.shape}")
         action_mask = self.get_safe_action_mask(x_state=x,edge_index=edge_index, unc_net=unc_net,mask=torch.Tensor(mask),num_moves=num_moves,neighbors=neighbors,position=position).to(self.device) 
-        
+        print(f"in function logits shape is {logits.shape}")
+
         masked_logits = logits  * action_mask
+        print(f"after transformation, logits shape are {masked_logits.shape}")
      
-        return masked_logits, value, x_combined, edge_index 
+        return masked_logits, value, x_combined[:,:3], edge_index 
