@@ -4,37 +4,21 @@ from torch_geometric.nn import GAT, TransformerConv, MLPAggregation
 from torch_geometric.utils import from_networkx, get_laplacian, to_dense_adj, add_self_loops
 import networkx as nx
 
-class models_full_model(torch.nn.Module):
+class centralized_full_model(torch.nn.Module):
     
-    def get_safe_action_mask(self,mask:list, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
+    def get_safe_action_mask(self,mask:torch.Tensor, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
+            #print("getting safe action mask")
             
-            threshold = num_moves
-            assert neighbors[position]==1
-                # 1. Current Safety h(x_t)
-            
-            predicted_u_current = unc_net(x_state, edge_index,num_moves)
-            
-            h_t = threshold - torch.max(predicted_u_current)
-            
+            predicted_u_current = unc_net(x_state[:,:3], edge_index,num_moves)
+            h_t = torch.max(predicted_u_current)
             lower_bound = (1 - eta) * h_t
-            
             safe_mask = torch.zeros(self.number_of_nodes)
-            
             for node_idx in range(self.number_of_nodes):
-                h_next = threshold - predicted_u_current[node_idx]
+                h_next = predicted_u_current[node_idx]
                 
                 if h_next >= lower_bound:
                     safe_mask[node_idx] = 1
-            mask=torch.tensor(mask)*safe_mask
-            min_val:int = 0
-            min_node:int = 0
-            for node in range(50):
-                if node in neighbors:
-                    if (threshold - predicted_u_current[node]) < min_val:
-                        min_val=threshold - predicted_u_current[node]
-                        min_node=node
-            mask[min_node] = 1
-            mask[position]=1
+            mask = mask*safe_mask
             return mask
     def __init__(self, number_of_nodes):
         
@@ -45,34 +29,33 @@ class models_full_model(torch.nn.Module):
         else:
             self.device="cpu"
         self.graph_attention = GAT(in_channels=6, hidden_channels=8, num_layers=2, out_channels=5)
-        self.actor = nn.Sequential(nn.Linear(self.number_of_nodes*5,5),nn.ReLU(),nn.Linear(5,30), nn.ReLU(),nn.Linear(30,1)).to(self.device)
-        self.critic = nn.Sequential(nn.Linear(self.number_of_nodes*3,16),nn.ReLU(),nn.Linear(16,5), nn.ReLU(),nn.Linear(5,1)).to(self.device)
+        self.multihead = nn.MultiheadAttention(embed_dim=5, num_heads=1)
+        self.transform_two = TransformerConv(5, 5, heads=1)
+        self.actor = nn.Sequential(nn.Linear(5,5), nn.GELU(), nn.Linear(5,5), nn.GELU(), nn.Linear(5,1))
+        self.critic = nn.Sequential(nn.Linear(3*self.number_of_nodes,5),nn.GELU(),nn.Linear(5,5), nn.GELU(), nn.Linear(5,1))
+
     def compute_pyg_laplacian_features(self, data, k=2):
         edge_index, _ = get_laplacian(data.edge_index, normalization='sym', num_nodes=self.number_of_nodes)
         L = to_dense_adj(edge_index, max_num_nodes=self.number_of_nodes).squeeze(0)
         evals, evecs = torch.linalg.eigh(L)
         return evecs[:, :k]
 
-    def forward(self, mental_map_nx: nx.Graph, mask: list, unc_net, num_moves, neighbors, position):
+    def forward(self, mental_map_nx: nx.Graph, mask: list,unc_net,num_moves,neighbors,position):
 
-        data = from_networkx(mental_map_nx, group_node_attrs=["uncertainty", "agent_presence", "target"])
+        data = from_networkx(mental_map_nx, group_node_attrs=["uncertainty", "agent_presence", "target"]).to(self.device)
 
-        lap_ev = self.compute_pyg_laplacian_features(data.to(self.device))
+        lap_ev = self.compute_pyg_laplacian_features(data)
         
         data_x = (data.x).to(self.device).float()
-        print("got here 1")
-        data_x = data_x.flatten()
-        print("got here 2")
-        data_x.to(self.device)
-        print(f" data_x device is {data_x.device}")
-        print(f"shape of data_x is {data_x.shape}")
-
-        value = self.critic(data_x)
-
-        print("got here 3")
-        x_combined = torch.cat([data.x, lap_ev], dim=1) # [50, 5]
         
-        uncertainty_prediction = unc_net(data.x, data.edge_index,move_num=num_moves).to(self.device) # [50, 1]
+        data_x = data_x.flatten()
+        value = self.critic(data_x)
+        data.x = data.x.float()
+        x_combined = torch.cat([data.x, lap_ev], dim=1) 
+        #print(f"before first unc prediction, {data.x.shape}")
+       # print(f"Devices of each thing include {data.x.device} {data.edge_index}")
+        #print(data.x)
+        uncertainty_prediction = unc_net(data.x, data.edge_index,move_num=num_moves) 
         
         uncertainty_prediction = uncertainty_prediction.to(self.device)
         
@@ -87,11 +70,12 @@ class models_full_model(torch.nn.Module):
         edge_index = edge_index.to(self.device)
         
         x = self.graph_attention(x_enriched, edge_index)
-        
-        logits = self.actor(x.flatten())
-        
-        action_mask = self.get_safe_action_mask(x_state=x,edge_index=edge_index,unc_net=unc_net,mask=mask,num_moves=num_moves,neighbors=neighbors,position=position).to(self.device) 
-        
+        logits = self.actor(x).squeeze(-1)
+        #print(f"get safe action mask x data shape is {x.shape}")
+        action_mask = self.get_safe_action_mask(x_state=x,edge_index=edge_index, unc_net=unc_net,mask=torch.Tensor(mask),num_moves=num_moves,neighbors=neighbors,position=position).to(self.device) 
+        #print(f"in function logits shape is {logits.shape}")
+
         masked_logits = logits  * action_mask
+        #print(f"after transformation, logits shape are {masked_logits.shape}")
      
-        return masked_logits, value, x_combined, edge_index 
+        return masked_logits, value, x_combined[:,:3], edge_index 

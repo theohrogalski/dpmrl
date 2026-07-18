@@ -2,7 +2,6 @@
 # Need: a loop that trains, then tests, a specific model with an easily locatable checkpoint file
 # Structure: Either train all at once then check then test then check OR train once, check, test once, check etc
 from training import centralized_training
-
 from model_variants import centralized_full_model
 
 from eval.eval import algorithm_evaluator
@@ -14,13 +13,13 @@ import tqdm
 import pathlib
 class auto_trainer_tester:
     def __init__(self):
-        self.num_nodes_to_agents:dict = {100:2,200:4,50:4}
+        self.num_nodes_to_agents:dict = {100:8,200:16,50:4}
 
         self.random_seeds:list = [818,312,10492]
         
         self.checkpoint_list:list = []
         
-        self.model_list:list = [centralized_full_model.models_full_model] 
+        self.model_list:list = [centralized_full_model.centralized_full_model] 
 
 
         self.training_id = 0
@@ -43,7 +42,7 @@ class auto_trainer_tester:
             print(f"setting model object to {model_obj}")
             for num_nodes, num_agents in self.num_nodes_to_agents.items():
                 print(f"setting num nodes {num_nodes}, agents to {num_agents}")
-                for seed in self.random_seeds:
+                for seed in tqdm.tqdm(self.random_seeds):
                     print(f"Setting seed to {seed}")
                     print("Starting training...")
                     self.train(model = model_obj, max_moves = self.max_moves, max_iters = self.max_iters, num_nodes = num_nodes, num_agents = num_agents, seed = seed)

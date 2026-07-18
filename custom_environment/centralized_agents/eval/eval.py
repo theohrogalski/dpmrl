@@ -3,7 +3,7 @@ import random
 import ast
 import argparse
 from matplotlib import pyplot as plt
-from model_variants.centralized_full_model import models_full_model
+
 from env import centralized_graph_env
 import logging
 

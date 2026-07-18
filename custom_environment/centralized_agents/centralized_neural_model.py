@@ -3,7 +3,7 @@ from torch.nn import Module
 import networkx as nx
 from torch_geometric.nn import GCNConv
 import matplotlib.pyplot as plt
-class uncertainty_estimator(Module):
+class uncertainty_estimator(Module) :
     """_This module is the same as the decentralized neural state estimator, except that it
     takes in the observations from every agent, not just one._
     """
@@ -11,36 +11,31 @@ class uncertainty_estimator(Module):
         super().__init__()
         
         if torch.cuda.is_available():
-            print("cuda2")
             self.device="cuda"
         else: 
             self.device="cpu"
+        #print(f"Self Device is {self.device}")
         self.episodes=0
         self.num_nodes=num_nodes
         self.max_moves=max_moves
+        
             # optional second layer for better graph depth                  
-        self.lin = torch.nn.utils.spectral_norm(torch.nn.Linear(2,1)).to(self.device)
+        self.lin = torch.nn.Sequential(torch.nn.Linear(3,3),torch.nn.GELU(), torch.nn.Linear(3,1))
+        self.lin=self.lin.to(self.device)
+        #print(self.device)
+
         self.loss_data=[]
-        self.gamma =0.99
         self.optimizer = torch.optim.Adam(self.parameters(),lr=1e-3)
         self.loss_f = torch.nn.MSELoss()
         self.current_loss=0
 
     def forward(self,x,edge_index,move_num):
-        #print(type(edge_index))
-        x= x.to(self.device)
-        x=x[:,0]
-        move_num = torch.tensor(move_num).expand(self.num_nodes)
-        move_num = move_num.to(self.device).float()
-        #print(move_num.shape)
-        #print(x.shape)
-        x = torch.concat((x.unsqueeze(1),move_num.unsqueeze(1)),1).to(self.device)
+        x =self.lin(x)
 
-        x=(self.lin(x))*self.gamma
         #print(f"shape of x here iss {x.shape}")
         return x
     
-    def update_estimator(self, x, edge_index,move_num):
+    def update_estimator(self, x, last_x, edge_index,move_num):
         """_This function takes updates the estimation model via taking in graph data, 
         using it to run a forward pass of the model, and comparing the result to the 
         actual data. Essentially: error = |G|^-1 * sum((x_t-f(x)_t)^n), where x is the graph data
@@ -55,17 +50,17 @@ class uncertainty_estimator(Module):
         Returns:
             _type_: _description_
         """
-        if move_num%(self.max_moves-1)==0:
-            self.episodes+=1
-            self.loss_data=[]
-        # Ensure the model is in training mode
-        self.train() 
+        #print(f" in update estimator, x shape is {x.shape}, last_x shape is {last_x.shape}")
+        x=x.to(self.device)
+        last_x=last_x.to(self.device)
+
         
-        prediction = self.forward(x, edge_index,move_num)
-        target = x.detach() 
-    
-        target = target[:,0].reshape(self.num_nodes,1)
-     
+        self.train() 
+        prediction = self.forward(x=last_x, edge_index=edge_index,move_num=move_num)
+        #print(f"prediction size is {prediction.size}")
+        target = x[:,0].reshape(self.num_nodes,1)
+        #print(f"target size is {target.size}")
+
         loss = self.loss_f(prediction, target)
         self.loss_data.append(loss.item())
         self.optimizer.zero_grad()

@@ -101,9 +101,11 @@ class dpmrl_trainer:
         return total_loss
    
     def train_loop(self,num_nodes,num_agents,random_seed):
+        torch.autograd.set_detect_anomaly(True)
+
         # Configuring the logger
         
-        logging.basicConfig(filename=f"{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log", level=logging.INFO)
+        logging.basicConfig(filename=f"./logs/{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log", level=logging.INFO)
         logging.info("started logging...")
         env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents,seed=random_seed,render_mode="human",max_moves=self.max_moves,graph_selection=0)
         if torch.cuda.is_available():
@@ -130,7 +132,7 @@ class dpmrl_trainer:
         while env.agents and max_iters>num_iters:
             if env.num_moves % env.max_moves == 0 and env.num_moves !=0:
                 print("saving checkpoint")
-                self.save_marl_checkpoint(episode=num_iters,obs_net = self.obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
+                self.save_marl_checkpoint(episode=num_iters,obs_net = self.obs_net, model=self.model,unc_net=env.neural_model, training_id=self.training_id,optimizer=optimizers,epoch=num_iters,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
                 #self.diagnostic_plots(step=env.num_moves, reward_history=reward_history,epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=self.net_loss)
                 env.reset()                
                 uncertainty_history = []
@@ -157,15 +159,16 @@ class dpmrl_trainer:
                 logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 if last_state is None:
                     last_state = x_state
-                assert x_state.shape == torch.Size([50,3])
-                assert last_state.shape == torch.Size([50,3])
-                unc_loss = env.neural_model.update_estimator(last_x=last_state, x = x_state.detach(), edge_index = edges,move_num=env.num_moves)
-                print(f"logit shape is {logits.shape}")
-                assert logits.shape == torch.Size([50])
+                #print(f" x_state shape here is {x_state.shape}")
+                #assert x_state.shape == torch.Size([env.num_nodes,3])
+                #assert last_state.shape == torch.Size([e3])
+                unc_loss = env.neural_model.update_estimator(x = x_state.detach(),last_x=last_state, edge_index = edges,move_num=env.num_moves)
+                #print(f"logit shape is {logits.shape}")
+                #assert logits.shape == torch.Size([50])
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
 
-                print(f"action shape is {actions[agent].shape}")
+                #print(f"action shape is {actions[agent].shape}")
                 #DEBUG
                 #print(f"Actions for {agent} are {actions[agent]}")
                 #/DEBUG
@@ -175,7 +178,6 @@ class dpmrl_trainer:
 
             for agent in env.agents:
                 reward = torch.tensor([rewards[agent]], device=dev)
-                value = values[agent]
 
                 _,next_val,_,_ = self.obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
                 if env.step==env.max_moves-1:
@@ -184,13 +186,13 @@ class dpmrl_trainer:
                     done=0
 
                 log_prob = dist.probs[actions[agent]].item()
-                total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
-                value = values[agent]
+            total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
 
-                optimizers.zero_grad()
-                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
-                total_loss.backward()
-                optimizers.step()
+            optimizers.zero_grad()
+            logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss)}")
+
+            total_loss.backward()
+            optimizers.step()
                 
             # Logging
             reward_history[agent].append(rewards)
@@ -218,11 +220,11 @@ if __name__=="__main__":
     saving_dir = pathlib.Path.cwd()/ "checkpoints"
 
     args = parser.parse_args()
-    print(args.model)
+    #print(args.model)
     model_string:str = args.model
 
     model = globals().get(model_string)
-    print(model)
+    #print(model)
     train_obj=dpmrl_trainer(max_iters=args.max_iters,model = model, training_id=args.training_id, max_moves=args.max_moves, saving_dir=saving_dir)
     
     nodes_for_data=args.num_nodes
