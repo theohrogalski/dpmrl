@@ -1,7 +1,7 @@
-from decentralized_agents.env.decentralized_graph_env import GraphEnv
+from env.decentralized_graph_env import GraphEnv
 import torch
 import os
-from decentralized_agents.model_variants.models_full_model_d import models_full_model
+from decentralized_agents.model_variants.full_model import models_full_model
 from random import randint
 from torch.distributions import Categorical
 import argparse 
@@ -12,18 +12,18 @@ import matplotlib
 from matplotlib import pyplot as plt
 from torch.nn.functional import mse_loss
 
-class trainer:
+class dpmrl_trainer:
 
-    def __init__(self,model,max_iters:int,saving_dir:str,max_moves:int=1):
+    def __init__(self,model,max_iters:int, seed:int, saving_dir:str,max_moves:int=1, training_id:str="default_train_id"):
 
         self.max_iters=max_iters
         self.random_num=randint(1,9999999999)
         self.saving_dir=saving_dir
         self.max_moves=max_moves
         self.model = model
-        
-        
-        
+        self.training_id = training_id
+        self.seed = seed
+    
     def save_marl_checkpoint(self,episode, obs_nets, unc_nets,model, optimizers,epoch, path="./checkpoints/",ag_num=0, num_nodes=0,random_seed=0):
         """_save_marl_checkpoint saves a richly named .pt file containing a trained model at a certain point, including all relevant weights: each of the _
 
@@ -50,21 +50,14 @@ class trainer:
             'opt_state_dict': {agent: opt.state_dict() for agent, opt in optimizers.items()},
         }
 
-        temp_path = f"{path}ckpoint_dense_{episode}_final_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}.tmp"
-        final_path = f"{path}ckpoint_dense_{episode}_final_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}.pt"
-        print(f"saving ckpt {path}_ckpoint_{episode}_{num_nodes}_{ag_num}_{epoch}_{self.model}_{random_seed}")
-        torch.save(checkpoint, temp_path)
-        os.rename(temp_path, final_path)
-        
-        torch.save(checkpoint, f"{path}latest.pt")
+        if not os.path.exists(f"./checkpoints/training_id_{self.training_id}/{model.__name__}/seed_{self.seed}"):
+            os.makedirs(f"./checkpoints/training_id_{self.training_id}/{model.__name__}/seed_{self.seed}")
+        torch.save(checkpoint, f"./checkpoints/training_id_{self.training_id}/{model.__name__}/seed_{self.seed}/model_{model.__name__}_ep_{episode}_seed_{random_seed}_trainingid_{self.training_id}_{num_nodes}.pt")
     
 
     cur_length_list = []
     def diagnostic_plots(self,step,reward_history,epoch,uncertainty_history,neural_net_history):
-        """
-        Saves a figure to the /results folder.
-        """
-        
+
         matplotlib.use('Agg') 
         
         fig,ax= plt.subplots(3,3)
@@ -87,9 +80,10 @@ class trainer:
             axes.plot(reward_history)
             i+=1
     #--------------------------------------------------------------
+        if not os.path.exists(f"./results/{self.training_id}"):
 
-
-        plt.savefig(f"step:_{step}_epoch:_{epoch}_final_5.png")
+            os.makedirs(f"./results/{self.training_id}")
+        plt.savefig(f"./results/{self.training_id}/step:_{step}_epoch:_{epoch}_final_5.png")
         plt.close()
 
 
@@ -109,6 +103,10 @@ class trainer:
         Returns:
             _type_: _description_
         """
+       # #print(log_prob)
+      #  #print(value)
+       # #print(reward)
+        ##print(next_value)
         mask = 1 - int(done)
         target = reward + (gamma * next_value * mask)
         advantage = target - value
@@ -121,15 +119,17 @@ class trainer:
    
     def train_loop(self,num_nodes,num_agents,random_seed):
         # Configuring the logger
-        logger = logging.getLogger(f"fm_{num_nodes}_{num_agents}")
-        logging.basicConfig(filename=f"fm_{num_nodes}_{num_agents}", level=logging.INFO)
+        if not os.path.exists(f"./logs/training_id_{self.training_id}/seed_{self.seed}"):
+            os.makedirs(f"./logs/training_id_{self.training_id}/seed_{self.seed}")
+
+        logging.basicConfig(filename=f"./logs/training_id_{self.training_id}/seed_{self.seed}/{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log", level=logging.INFO)
 
         env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents)
         if torch.cuda.is_available():
             dev="cuda"
         else:
             dev="cpu"
-        obs_nets:dict = {agent:self.model(env.graph.number_of_nodes())for agent in env.possible_agents}
+        obs_nets:dict = {agent:self.model(env.graph.number_of_nodes()) for agent in env.possible_agents}
         for nets in obs_nets.values():
             nets.to(dev)
         optimizers = {agent:torch.optim.Adam(obs_nets[agent].parameters()) for agent in env.agents}
@@ -142,7 +142,8 @@ class trainer:
         max_iters=self.max_iters
         num_iters=0
         uncertainty_history:list = []
-
+        last_state = None
+        x_state = None
 
         while env.agents and max_iters>num_iters:
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
@@ -153,7 +154,7 @@ class trainer:
                 uncertainty_history = []
                 reward_history:dict = {agent:[] for agent in env.possible_agents}
                 num_iters+=1
-                logger.info(f"Iteration Changing to {num_iters}")
+                logging.info(f"Iteration Changing to {num_iters}")
 
             actions={}
 
@@ -167,10 +168,17 @@ class trainer:
             #step_data={}
             
             for agent in env.agents:
+                if x_state is not None:
+                   last_state = x_state
                 logits, value, x_state, edges = obs_nets[agent](mental_map_nx=env.mental_map[agent], mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 unc_net = env.agent_to_net[agent]
-                unc_loss = unc_net.update_estimator(x_state.detach(), edges,move_num=env.num_moves)
+                if last_state is None:
+                    #print(x_state.shape)
+                    last_state = x_state
+                #print(f"Here, x state shape is {x_state.detach().shape}")
+                unc_loss = unc_net.update_estimator(x_state.detach(), last_state, edges,move_num=env.num_moves)
                 unc_loss_dict[agent]=unc_loss
+
 
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
@@ -196,10 +204,11 @@ class trainer:
                     done=1
                 else:
                     done=0
-                total_loss = self.compute_ac_loss(log_prob[agent], value, reward, next_val, done)
+
+                total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
 
                 optimizers[agent].zero_grad()
-                logger.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
+                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
                 total_loss.backward()
                 optimizers[agent].step()
                 
@@ -224,7 +233,7 @@ if __name__=="__main__":
     parser.add_argument("--max_moves",type=int)
     parser.add_argument("--max_iters")
     args = parser.parse_args()
-    train_obj=trainer(max_iters=args.max_iters,model=ast.literal_eval(args.model), max_moves=args.max_moves,saving_dir=args.saving_dir)
+    train_obj=dpmrl_trainer(max_iters=args.max_iters,model=ast.literal_eval(args.model), max_moves=args.max_moves,saving_dir=args.saving_dir)
     nodes_for_data=args.num_nodes_list
     num_agents_for_testing=args.num_agents_list
     for nn in nodes_for_data:

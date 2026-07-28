@@ -15,22 +15,21 @@ class auto_trainer_tester:
     def __init__(self):
         self.num_nodes_to_agents:dict = {100:4,200:4,50:4}
 
-        self.random_seeds:list = [818,312,10492]
+        self.random_seeds:list = [63458]
         
         self.checkpoint_list:list = []
         
         self.model_list:list = [centralized_full_model.centralized_full_model] 
 
 
-        self.training_id = 5
+        self.training_id = "solo3"
 
-        self.max_moves = 300
+        self.max_moves = 500
 
-        self.max_iters = 30
+        self.max_iters = 100
 
     def train(self,model, max_iters, max_moves, num_nodes, num_agents, seed):
-        trainer = centralized_training.dpmrl_trainer(model = model, max_iters = max_iters, saving_dir = "./checkpoints",max_moves=max_moves, training_id = self.training_id, seed = seed)
-        self.training_id+=1
+        trainer = centralized_training.dpmrl_trainer(model = model, max_iters = max_iters,seed=seed, saving_dir = "./checkpoints",max_moves=max_moves, training_id = self.training_id, seed = seed)
         trainer.train_loop(num_nodes = num_nodes, num_agents = num_agents, random_seed = seed)
 
     def eval(self, num_nodes,num_agents, checkpoint:str,model,max_iters, seed,max_moves):
@@ -43,15 +42,11 @@ class auto_trainer_tester:
             for num_nodes, num_agents in self.num_nodes_to_agents.items():
                 print(f"setting num nodes {num_nodes}, agents to {num_agents}")
                 for seed in tqdm.tqdm(self.random_seeds):
-                    if skip_seed_818 == 1:
-                        skip_seed_818 = 0
-                        continue
-                    else:
-                        print(f"Setting seed to {seed}")
-                        print("Starting training...")
-                        self.train(model = model_obj, max_moves = self.max_moves, max_iters = self.max_iters, num_nodes = num_nodes, num_agents = num_agents, seed = seed)
-                        print("Starting evaluation...")
-                        #self.eval(model = model_obj, num_nodes = num_nodes, max_iters = self.max_iters, seed = seed, num_agents = num_agents, max_moves = self.max_moves, checkpoint = f"./checkpoints/training_id_{self.training_id}/seed_{self.seed}_checkpoint_model_{model_obj.__name__}_ep_{self.max_iters-1}_seed_{seed}_trainingid_{self.training_id-1}.pt")
+                    print(f"Setting seed to {seed}")
+                    print("Starting training...")
+                    #self.train(model = model_obj, max_moves = self.max_moves, seed=seed max_iters = self.max_iters, num_nodes = num_nodes, num_agents = num_agents, seed = seed)
+                    print("Starting evaluation...")
+                    self.eval(model = model_obj, num_nodes = num_nodes, max_iters = self.max_iters, seed = seed, num_agents = num_agents, max_moves = self.max_moves, checkpoint = f"./checkpoints/training_id_{self.training_id}/seed_{self.seed}_checkpoint_model_{model_obj.__name__}_ep_{self.max_iters-1}_seed_{seed}_trainingid_{self.training_id-1}.pt")
             
 
 if __name__ == "__main__":

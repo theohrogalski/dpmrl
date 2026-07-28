@@ -13,7 +13,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from torch import tensor
 from random import randint
-from decentralized_agents.training.decentralized_neural_model import uncertainty_estimator as ue 
+from decentralized_agents.model_variants.decentralized_state_estimator import uncertainty_estimator as ue 
 from stable_baselines3 import DQN, PPO, A2C
 import torch
 from copy import copy

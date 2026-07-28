@@ -1,15 +1,15 @@
 import torch
-from decentralized_agents.env.decentralized_graph_env import GraphEnv
+from env.decentralized_graph_env import GraphEnv
 import random
 import ast
 import argparse
 from matplotlib import pyplot as plt
-from decentralized_agents.model_variants.models_no_collision import models_no_collision
-from decentralized_agents.model_variants.models_extra_attention_d import models_extra_attention
-from decentralized_agents.model_variants.models_no_dcbf_d import models_no_dcbf
-from decentralized_agents.model_variants.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
-from decentralized_agents.model_variants.models_full_model_d import models_full_model
-from decentralized_agents.model_variants.models_no_state_estimation import models_no_state_est
+from decentralized_agents.model_variants.old.models_no_collision import models_no_collision
+from decentralized_agents.model_variants.old.models_extra_attention_d import models_extra_attention
+from decentralized_agents.model_variants.old.models_no_dcbf_d import models_no_dcbf
+from decentralized_agents.model_variants.old.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
+from decentralized_agents.model_variants.full_model import models_full_model
+from decentralized_agents.model_variants.old.models_no_state_estimation import models_no_state_est
 import logging
 import networkx as nx
 from time import time
@@ -21,11 +21,11 @@ from datetime import datetime
 
 from torch.distributions import Categorical
 
-from decentralized_agents.training.decentralized_neural_model import uncertainty_estimator as ue 
+from env.decentralized_state_estimator import uncertainty_estimator as ue 
 
 class algorithm_evaluator():
-    def __init__(self):
-        
+    def __init__(self,num_moves):
+        self.num_moves = num_moves
         self.rand=random.randint(0,99999)
         #self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
         

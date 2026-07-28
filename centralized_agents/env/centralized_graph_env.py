@@ -216,7 +216,7 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
         self.num_moves=0
         #print("num_moves is 0")
         for agent in self.possible_agents:
-            self.agent_position[agent] =  int(agent[6:])
+            self.agent_position[agent] =  int(random.randint(0,self.num_nodes-1))
             self.rewards[agent] = 0
             self._cumulative_rewards[agent] = 0
             self.infos[agent] = {}
@@ -355,8 +355,10 @@ class CentralizedGraphEnv(pettingzoo.ParallelEnv):
                 self.momentum[agent]+=1
             else:
                 self.momentum[agent]-=1
-            rewards[agent] = collision*0.1 + long_term*0.05 + self.momentum[agent]*0.05
 
+
+            rewards[agent] = collision*0.1 + long_term*0.05 + self.momentum[agent]*0.05
+           # print(size_of_mental_map)
         self.truncations = {
             agent: self.num_moves >= self.max_moves for agent in self.agents
             }

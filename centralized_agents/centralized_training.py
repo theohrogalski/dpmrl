@@ -56,7 +56,7 @@ class dpmrl_trainer:
        # print(self.training_seed)
         if not os.path.exists(f"./checkpoints/training_id_{self.training_id}/seed_{self.seed}"):
             os.makedirs(f"./checkpoints/training_id_{self.training_id}/seed_{self.seed}")
-        torch.save(checkpoint, f"""./checkpoints/training_id_{self.training_id}/seed_{self.seed}/checkpoint_model_{model.__name__}_ep_{episode}_seed_{random_seed}_trainingid_{training_id}.pt""")
+        torch.save(checkpoint, f"""./checkpoints/training_id_{self.training_id}/seed_{self.seed}/checkpoint_model_{model.__name__}_ep_{episode}_seed_{random_seed}_trainingid_{training_id}_{num_nodes}.pt""")
             
 
     cur_length_list = []
@@ -166,12 +166,15 @@ class dpmrl_trainer:
                 #print(f"type of agent is {env.agent_position[agent]}")
 
                 # /DEBUG
-            
+
                 if x_state is not None:
                     last_state = x_state
+                    #print("started last x real process")
                 logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 if last_state is None:
+                    print(x_state.shape)
                     last_state = x_state
+
                 #print(f" x_state shape here is {x_state.shape}")
                 #assert x_state.shape == torch.Size([env.num_nodes,3])
                 #assert last_state.shape == torch.Size([e3])

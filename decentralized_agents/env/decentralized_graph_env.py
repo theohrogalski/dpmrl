@@ -12,19 +12,14 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from torch import tensor
 from random import randint
-from decentralized_agents.training.decentralized_neural_model import uncertainty_estimator as ue 
-from stable_baselines3 import DQN, PPO, A2C
+from env.decentralized_state_estimator import uncertainty_estimator as ue 
 import torch
 from copy import copy
 from pettingzoo.utils import aec_to_parallel
-import supersuit as ss
 from torch.nn.functional import scaled_dot_product_attention
-from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.vec_env import VecMonitor
 from pettingzoo.test import api_test
 import pettingzoo
 import functools
-from filterpy.kalman import MerweScaledSigmaPoints
 import itertools
 from pettingzoo.utils.agent_selector import agent_selector
 from pettingzoo.utils import wrappers
@@ -54,7 +49,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
         self.render_mode=render_mode
         self.random_num = randint(0,10000)
         self.np_random_seed = int(np.random.randint(1, 10 + 1))
-        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"./graphs/for_testing/node_{self.num_nodes}")
+        self.graph:nx.Graph = self.select_graph(load_param=1,output_name=f"graph_{self.random_num}",loaded_graphml_name=f"./graphs/{self.num_nodes}_nodes")
         self.pos=nx.spring_layout(self.graph)
         ###print(f"Before: {list(self.graph.nodes)} | Type: {type(list(self.graph.nodes)[0])}")
         
@@ -82,7 +77,7 @@ class GraphEnv(pettingzoo.ParallelEnv):
         self._cumulative_rewards = {agent:0 for agent in self.agents}
         self.num_moves = 0
         self.obs_dict = {node:torch.Tensor() for node in range(self.num_nodes)}
-        self.agent_to_net:dict = {agent:ue(5,out_dim=1,hidden_dim=5,num_nodes=self.num_nodes,agent_name=agent) for agent in self.possible_agents}
+        self.agent_to_net:dict = {agent:ue(5,out_dim=1,hidden_dim=5,num_nodes=self.num_nodes,agent_name=agent, max_moves=max_moves,num_agents=self.num_agents) for agent in self.possible_agents}
         for net in self.agent_to_net.values():
 
             net.to(self.device)
