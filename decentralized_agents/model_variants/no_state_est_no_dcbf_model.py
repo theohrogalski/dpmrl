@@ -58,7 +58,7 @@ class no_state_est_model_no_dcbf(torch.nn.Module):
         else:
             self.device="cpu"
         # 1. Feature Processing
-        self.graph_attention = GAT(in_channels=6, hidden_channels=8, num_layers=2, out_channels=5)
+        self.graph_attention = GAT(in_channels=5, hidden_channels=8, num_layers=2, out_channels=5)
         self.multihead = nn.MultiheadAttention(embed_dim=5, num_heads=1)
         self.transform_two = TransformerConv(5, 5, heads=1)
 

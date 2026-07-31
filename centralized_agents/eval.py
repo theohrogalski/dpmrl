@@ -23,14 +23,18 @@ from torch.distributions import Categorical
 from state_estimator import uncertainty_estimator as ue 
 
 class algorithm_evaluator():
-    def __init__(self,num_moves,seed):
+    def __init__(self,num_moves:int, num_agents:int, num_nodes:int, seed:int):
+
         self.num_moves = num_moves
-        self.seed = seed
-        self.rand=random.randint(0,99999)
-        torch.manual_seed(self.seed)
-        #self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
+        
+        torch.manual_seed(seed) 
+
+        self.num_agents = num_agents
+
+        self.num_nodes = num_nodes       
         
         self.device= "cuda"
+        
     def sit_on_nodes(self):
         logging.basicConfig(filename=f'sitonnodes.log', level=logging.INFO)
         logger = logging.getLogger(f"sitonnodes")
@@ -76,27 +80,20 @@ class algorithm_evaluator():
 
 
 
-    def full_model(self, num_nodes,num_agents,ckpt:str,model, log_name:str, max_iters:int,seed:int):
-        log_dir = "logs/evaluation"
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-            
-        log_filename = f"{log_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        log_path = os.path.join(log_dir, log_filename)
-        
-        
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_path),  
-                 ]
-            )
+    def full_model(self,num_nodes,num_agents,ckpt,model,log_name, max_iters,seed=0):
+        if not os.path.exists(f"./logs/eval/seed_{seed}"):
+            os.makedirs(f"./logs/eval/seed_{seed}")
+        log_file = f"./logs/eval/seed_{seed}/{model.__name__}_{num_nodes}_{num_agents}_{seed}.log"
 
-        logging.info(f"Beginning eval. loop for seed {seed},max. iters:{max_iters}, num nodes: {num_nodes}, num agents: {num_agents}")    
-        logging.info("num_moves, agent, reward, action, uncertainty, occ_nodes")
+        logger = logging.getLogger(log_file)
+        logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        logger.addHandler(logging.FileHandler(log_file))
+        logger.setLevel(logging.INFO)
+        logger.info(f"model is {model}")
+        logger.info(f"Beginning eval. loop for seed {seed},max. iters:{max_iters}, num nodes: {num_nodes}, num agents: {num_agents}")    
+        logger.info("num_moves, agent, reward, action, uncertainty, occ_nodes")
         
-        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents,seed=self.seed,render_mode="human",max_moves=self.num_moves,graph_selection=0)        
+        env = centralized_graph_env.CentralizedGraphEnv(num_nodes=num_nodes,num_agents=num_agents,seed=seed,render_mode="human",max_moves=self.num_moves,graph_selection=0)        
         #"Evaluation for a pre-determined checkpoint for the full algorithm. Uses the self.ckpt as the path for loading models."
         check_dict  = torch.load(ckpt)
 
@@ -118,9 +115,9 @@ class algorithm_evaluator():
 
         obs_net.load_state_dict(obs_nets)
         obs_net.to(self.device)
-        agent_to_net = ue(5,out_dim=1,hidden_dim=5,num_nodes=num_nodes,agent_name=agent)
+        agent_to_net = ue(5,out_dim=1,hidden_dim=5,num_nodes=num_nodes, num_agents=self.num_agents, max_moves = 500)
 
-        agent_to_net.load_state_dict(unc_nets[agent])
+        agent_to_net.load_state_dict(unc_nets)
 
         actions={}
         while env.agents and num_iters<max_iters:
@@ -133,18 +130,18 @@ class algorithm_evaluator():
                 num_iters+=1
                 
             for agent in env.agents:
-                logits, value, x_state, edges = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],agent_to_net[agent], num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
+                logits, value, x_state, edges = obs_net(env.mental_map, env.action_mask_to_node[int(agent[6:])],agent_to_net, num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
-                logging.info(f"{env.num_moves}, {agent}, {env.rewards[agent]}  {actions[agent].item()}, {env.tot_unc}, {env.occupied_targets}")
+                logger.info(f"{env.num_moves}, {agent}, {env.rewards[agent]}  {actions[agent].item()}, {env.tot_unc}, {env.occupied_targets}")
 
             _,_,_,_,_ = env.step(actions)
             uncertainty_history.append(env.tot_unc)
-        logging.info(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
-        logging.info(total_uncertainty_ever)
+        logger.info(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
+        logger.info(total_uncertainty_ever)
         
-        logging.info(env.longest_time_without_a_visit)
-        logging.info(time()-time_start)               
+        logger.info(env.longest_time_without_a_visit)
+        logger.info(time()-time_start)               
         print(total_uncertainty_ever)
         return total_uncertainty_ever
     def partial_model(self,data):
@@ -175,16 +172,17 @@ class algorithm_evaluator():
                 actions[agent]=torch.tensor(random.sample(self.get_legal_actions(env.agent_position[agent],env.action_mask_to_node),1))
             _, _, _,_, _ = env.step(actions)
             uncertainty_history.append(env.tot_unc)
-        logger.info(f"{agents_num}_{nodes_num}")
+        logger.info(f"{self.num_agents}_{self.nu}")
         logger.info(total_uncertainty_ever)
         logger.info(env.longest_time_without_a_visit)
         logger.info(time()-time_start)
     def grazing(self):
         logger = logging.getLogger(f"log_grazing") 
+        
         starting_time=datetime.now().strftime('%H:%M:%S')   
         logging.basicConfig(filename=f'log_grazing_{starting_time}.log', level=logging.INFO)
         logging.info(f"Starting Logging at {starting_time}")
-        nodes_for_data=[50]
+        nodes_for_data=[50100,200]
         num_agents_for_testing=[4]
         
         for nodes_num in nodes_for_data:
@@ -235,9 +233,6 @@ class algorithm_evaluator():
                             actions[agent]=torch.tensor(env.agent_position[agent])
                            
                         
-
-
-
                     _, _, _,_, _ = env.step(actions)
                     uncertainty_history.append(env.tot_unc)
                 logger.info(f"{agents_num}_{nodes_num}")
@@ -281,10 +276,13 @@ if __name__=="__main__":
 
     eval=algorithm_evaluator()
     
-    
+    """    
     ckpt = globals().get(str(args.ckpt))
     model = models_full_model(50)
     print(ckpt)
     
     
     eval.full_model(num_nodes=args.num_nodes,num_agents=args.num_agents,ckpt=ckpt,model=model,log_name=f"centralized_data_collection",max_iters=args.max_iters,seed=args.random_seed)
+    """
+    eval.grazing()
+    eval.random()

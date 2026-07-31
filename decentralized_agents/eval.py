@@ -4,12 +4,7 @@ import random
 import ast
 import argparse
 from matplotlib import pyplot as plt
-from decentralized_agents.model_variants.old.models_no_collision import models_no_collision
-from decentralized_agents.model_variants.old.models_extra_attention_d import models_extra_attention
-from decentralized_agents.model_variants.old.models_no_dcbf_d import models_no_dcbf
-from decentralized_agents.model_variants.old.models_no_dcbf_no_state_estimation_d import models_no_dcbsf_no_state_est
-from decentralized_agents.model_variants.full_model import models_full_model
-from decentralized_agents.model_variants.old.models_no_state_estimation import models_no_state_est
+from model_variants import full_model, extra_attention_model,  no_collision_model, no_dcbf_model, no_state_est_model, no_state_est_no_dcbf_model
 import logging
 import networkx as nx
 from time import time
@@ -24,16 +19,29 @@ from torch.distributions import Categorical
 from env.decentralized_state_estimator import uncertainty_estimator as ue 
 
 class algorithm_evaluator():
-    def __init__(self,num_moves):
+    def __init__(self,num_moves:int, num_agents:int, num_nodes:int, seed:int):
+
         self.num_moves = num_moves
-        self.rand=random.randint(0,99999)
-        #self.model_list = [models_no_dcbsf_no_state_est, models_extra_attention, models_full_model]
+        
+        torch.manual_seed(seed) 
+
+        self.num_agents = num_agents
+
+        self.num_nodes = num_nodes       
         
         self.device= "cuda"
+
     def sit_on_nodes(self):
-        logging.basicConfig(filename=f'sitonnodes.log', level=logging.INFO)
-        logger = logging.getLogger(f"sitonnodes")
-        nodes_for_data=[50]
+        if not os.path.exists(f"./logs/eval/sit_on_nodes"):
+            os.makedirs(f"./logs/eval/sit_on_nodes")
+        log_file = f"./logs/eval/sit_on_nodes/sit.log"
+
+        logger = logging.getLogger(log_file)
+        logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        logger.addHandler(logging.FileHandler(log_file))
+        logger.setLevel(logging.INFO)
+        logger.info(f"model is sit on nodes")
+        nodes_for_data=[50,100,200]
         num_agents_for_testing=[4]
         for nodes_num in nodes_for_data:
             for agents_num in num_agents_for_testing:
@@ -51,10 +59,10 @@ class algorithm_evaluator():
                     if env.num_moves%500==0 and env.num_moves!=0:
                         env.reset()
                         total_uncertainty_ever+=sum(uncertainty_history)
-                        print(total_uncertainty_ever)
+                        logging.info(total_uncertainty_ever)
                         uncertainty_history=[]
                         num_iters+=1
-                        print(f"Num iters for sit {num_iters+1}/100")
+                        logging.info(f"Num iters for sit {num_iters+1}/100")
                     for agent in env.agents:
                         if action_freeze[agent]==0:
                             if env.graph.nodes[env.agent_position[agent]]["target"]==1 and env.graph.nodes[env.agent_position[agent]]["agent_presence"]==0:
@@ -70,34 +78,28 @@ class algorithm_evaluator():
                     uncertainty_history.append(env.tot_unc)
                 logger.info(f"{agents_num}_{nodes_num}")
                 logger.info(total_uncertainty_ever)
-                logger.info(env.longest_time_without_a_visit)
-                logger.info(time()-time_start)
+                print(total_uncertainty_ever)
 
+                logger.info(env.longest_time_without_a_visit)
+                print(env.longest_time_without_a_visit)
+
+                logger.info(time()-time_start)
+                print(time()-time_start)
 
 
     def full_model(self,num_nodes,num_agents,ckpt,model,log_name, max_iters,seed=0):
-        log_dir = "logs/evaluation"
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-            
-        log_filename = f"{log_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        log_path = os.path.join(log_dir, log_filename)
-        
-        
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_path),  
-                 ]
-            )
+        if not os.path.exists(f"./logs/eval/seed_{seed}"):
+            os.makedirs(f"./logs/eval/seed_{seed}")
+        log_file = f"./logs/eval/seed_{seed}/{model.__name__}_{num_nodes}_{num_agents}_{seed}.log"
 
-        logging.info(f"Beginning eval. loop for seed {seed},max. iters:{max_iters}, num nodes: {num_nodes}, num agents: {num_agents}")    
-        logging.info("num_moves, agent, reward, action, uncertainty, occ_nodes")
+        logger = logging.getLogger(log_file)
+        logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        logger.addHandler(logging.FileHandler(log_file))
+        logger.setLevel(logging.INFO)
+        logger.info(f"model is {model}")
 
-        env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents,max_moves=500)
-        "Evaluation for a pre-determined checkpoint for the full algorithm. Uses the self.ckpt as the path for loading models."
-        check_dict  = torch.load(f"./checkpoints/{ckpt}.pt")
+        env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents,max_moves=self.num_moves)
+        check_dict  = torch.load(ckpt)
 
         obs_nets = check_dict["obs_state_dict"]
 
@@ -108,16 +110,14 @@ class algorithm_evaluator():
         uncertainty_history = []
         num_iters=0
         
-        print(f"model is {model}")
-        print(f"checkpoint is {ckpt}")
-
+        logger.info(f"checkpoint is {ckpt}")
 
         total_uncertainty_ever = 0
         obs_net:dict = {agent:model(env.graph.number_of_nodes()) for agent in env.possible_agents}
         for agent,model in obs_net.items():
             model.load_state_dict(obs_nets[agent])
             model.to(self.device)
-        agent_to_net:dict = {agent:ue(5,out_dim=1,hidden_dim=5,num_nodes=num_nodes,agent_name=agent) for agent in env.possible_agents}
+        agent_to_net:dict = {agent:ue(5,out_dim=1,hidden_dim=5,num_nodes=num_nodes,agent_name=agent, num_agents=self.num_agents, max_moves=self.num_moves) for agent in env.possible_agents}
         for agent, model in agent_to_net.items():
             
             model.load_state_dict(unc_nets[agent])
@@ -128,10 +128,10 @@ class algorithm_evaluator():
             if env.num_moves%500==0 and env.num_moves!=0:
                 env.reset()
                 total_uncertainty_ever+=sum(uncertainty_history)
-                print(total_uncertainty_ever)
+                logger.info(total_uncertainty_ever)
                 uncertainty_history=[]
                 num_iters+=1
-                print(f"num iters: {num_iters}")
+                logger.info(f"num iters: {num_iters}")
                 
             for agent in env.agents:
                 logits, value, x_state, edges = obs_net[agent](env.mental_map[agent], env.action_mask_to_node[int(agent[6:])],agent_to_net[agent], num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
@@ -141,26 +141,36 @@ class algorithm_evaluator():
                 dist = Categorical(logits=logits)
                 actions[agent] = dist.sample()
                
-                logging.info(f"{env.num_moves}, {agent}, {env.rewards[agent]}  {actions[agent].item()}, {env.tot_unc}, {env.occupied_targets}")
+              #  logging.info(f"{env.num_moves}, {agent}, {env.rewards[agent]}  {actions[agent].item()}, {env.tot_unc}, {env.occupied_targets}")
 
             _,_,_,_,_ = env.step(actions)
             uncertainty_history.append(env.tot_unc)
-        logging.info(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
-        logging.info(total_uncertainty_ever)
-        
-        logging.info(env.longest_time_without_a_visit)
-        logging.info(time()-time_start)               
+        logger.info(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
+        print(f"{num_agents}_{num_nodes}_{log_name}_{max_iters}_iters")
+        logger.info(total_uncertainty_ever)
+        print(total_uncertainty_ever)
+        logger.info(env.longest_time_without_a_visit)
+        print(env.longest_time_without_a_visit)
+        logger.info(time()-time_start)             
+        print(time()-time_start)  
+        logger.info(total_uncertainty_ever)
         print(total_uncertainty_ever)
         return total_uncertainty_ever
     def partial_model(self,data):
         statistics=[]
     
     def random(self):
-        logger = logging.getLogger(f"log_random")    
-        logging.basicConfig(filename=f'log_random.log', level=logging.INFO)
+        if not os.path.exists(f"./logs/eval/random"):
+            os.makedirs(f"./logs/eval/random")
+        log_file = f"./logs/eval/random/random.log"
 
-        nodes_for_data=[20,50,100]
-        num_agents_for_testing=[1,2,4,15]
+        logger = logging.getLogger(log_file)
+        logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        logger.addHandler(logging.FileHandler(log_file))
+        logger.setLevel(logging.INFO)
+        logger.info(f"model is random")
+        nodes_for_data=[50,100,200]
+        num_agents_for_testing=[4]
         
         for nodes_num in nodes_for_data:
             for agents_num in num_agents_for_testing:
@@ -175,13 +185,13 @@ class algorithm_evaluator():
                     if env.num_moves%500==0 and env.num_moves!=0:
                         
                         total_uncertainty_ever+=sum(uncertainty_history)
-                        print(total_uncertainty_ever)
+                        logging.info(total_uncertainty_ever)
                         
                         
                         env.reset()
                         uncertainty_history=[]
                         num_iters+=1
-                        print(f"Num iters for Random at {num_iters}/100")
+                        logging.info(f"Num iters for Random at {num_iters}/100")
                     for agent in env.agents:
                         actions[agent]=torch.tensor(random.sample(self.get_legal_actions(env.agent_position[agent],env.action_mask_to_node),1))
                     _, _, _,_, _ = env.step(actions)
@@ -191,11 +201,16 @@ class algorithm_evaluator():
                 logger.info(env.longest_time_without_a_visit)
                 logger.info(time()-time_start)
     def grazing(self):
-        logger = logging.getLogger(f"log_grazing") 
-        starting_time=datetime.now().strftime('%H:%M:%S')   
-        logging.basicConfig(filename=f'log_grazing_{starting_time}.log', level=logging.INFO)
-        logging.info(f"Starting Logging at {starting_time}")
-        nodes_for_data=[50]
+        if not os.path.exists(f"./logs/eval/grazing"):
+                    os.makedirs(f"./logs/eval/grazing")
+        log_file = f"./logs/eval/grazing/grazing.log"
+
+        logger = logging.getLogger(log_file)
+        logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        logger.addHandler(logging.FileHandler(log_file))
+        logger.setLevel(logging.INFO)
+        logger.info(f"model is grazing")
+        nodes_for_data=[50,100,200]
         num_agents_for_testing=[4]
         
         for nodes_num in nodes_for_data:
@@ -212,13 +227,13 @@ class algorithm_evaluator():
                     if env.num_moves%500==0 and env.num_moves!=0:
                         
                         total_uncertainty_ever+=sum(uncertainty_history)
-                        print(total_uncertainty_ever)
+                        logging.info(total_uncertainty_ever)
                         
                         
                         env.reset()
                         uncertainty_history=[]
                         num_iters+=1
-                        print(f"Num iters for Random at {num_iters}/100")
+                        logging.info(f"Num iters for grazing at {num_iters}/100")
                     for agent in env.agents:
                         if env.graph.nodes[env.agent_position[agent]]["uncertainty"]==0 and agent_path_dict[agent]==[]:
                             
@@ -265,8 +280,8 @@ def automatic_evaluation_for_grazing(eto):
     num_agents_for_testing=[4]
     for nn in nodes_for_data:
         for ag in num_agents_for_testing:
-            print(f"nn is {nn}")
-            print(f"ag is {ag}")
+            logging.info(f"nn is {nn}")
+            logging.info(f"ag is {ag}")
             eto.grazing(num_agents=ag,num_nodes=nn)
 
 """if __name__=="__main__":
@@ -289,26 +304,30 @@ if __name__=="__main__":
     parser.add_argument("--num_agents",type=int)
     parser.add_argument("--max_iters")
     args = parser.parse_args()
-    
-    empty_ckpt_list=[]
+    eval = algorithm_evaluator(num_agents=4, num_moves=500, num_nodes = 10, seed=0)
+    """  empty_ckpt_list=[]
     for ckpt in args.ckpt_list:
         for rs in args.random_seed_list:            
             empty_ckpt_list.append(ckpt+rs)
     ckpt_list = empty_ckpt_list
 
-    eval=algorithm_evaluator()
+    eval=algorithm_evaluator()"""
     
     
 
-    for ckpt in empty_ckpt_list:
-        print(ckpt)
+    """for ckpt in empty_ckpt_list:
+        logging.info(ckpt)
         seed=ckpt[-4:-1]
         for model in args.model_list :
             model = ast.literal_eval(model)
-            print(ckpt)
+            logging.info(ckpt)
             if model.__name__ in ckpt:
-                print(f"{model.__name__} --- {ckpt}")
+                logging.info(f"{model.__name__} --- {ckpt}")
                 model_class=model
         
         
         eval.full_model(num_nodes=args.num_nodes,num_agents=args.num_agents,ckpt=ckpt,model=model_class,log_name=f"{model.__name__}_data_collection",max_iters=args.max_iters,seed=seed)
+    """
+    eval.random()
+    eval.grazing()
+    eval.sit_on_nodes()

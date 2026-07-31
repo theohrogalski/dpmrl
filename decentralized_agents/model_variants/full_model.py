@@ -4,7 +4,7 @@ from torch_geometric.nn import GAT, TransformerConv, MLPAggregation
 from torch_geometric.utils import from_networkx, get_laplacian, to_dense_adj, add_self_loops
 import networkx as nx
 
-class models_full_model(torch.nn.Module):
+class full_model(torch.nn.Module):
     
     def get_safe_action_mask(self,mask:list, x_state, neighbors, edge_index, unc_net, threshold=100, eta=0.1,num_moves=0,position=0):
 

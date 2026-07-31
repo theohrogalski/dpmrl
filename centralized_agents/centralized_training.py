@@ -170,7 +170,7 @@ class dpmrl_trainer:
                 if x_state is not None:
                     last_state = x_state
                     #print("started last x real process")
-                logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
+                logits, value, x_state, edges = self.obs_net(mental_map_nx=env.mental_map, mask=env.action_mask_to_node[env.agent_position[agent]],unc_net=env.neural_model,num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 if last_state is None:
                     print(x_state.shape)
                     last_state = x_state

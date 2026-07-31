@@ -1,7 +1,6 @@
 from env.decentralized_graph_env import GraphEnv
 import torch
 import os
-from decentralized_agents.model_variants.full_model import models_full_model
 from random import randint
 from torch.distributions import Categorical
 import argparse 
@@ -119,10 +118,13 @@ class dpmrl_trainer:
    
     def train_loop(self,num_nodes,num_agents,random_seed):
         # Configuring the logger
-        if not os.path.exists(f"./logs/training_id_{self.training_id}/seed_{self.seed}"):
-            os.makedirs(f"./logs/training_id_{self.training_id}/seed_{self.seed}")
+        #if not os.path.exists(f"./logs/training_id_{self.training_id}/seed_{self.seed}"):
+        #    os.makedirs(f"./logs/training_id_{self.training_id}/seed_{self.seed}")
+        #log_file = f"./logs/training_id_{self.training_id}/seed_{self.seed}/{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log"
 
-        logging.basicConfig(filename=f"./logs/training_id_{self.training_id}/seed_{self.seed}/{self.model.__name__}_{num_nodes}_{num_agents}_{random_seed}.log", level=logging.INFO)
+       # logger = logging.getLogger(log_file)
+        #logger.handlers.clear()  # Prevent duplicate handlers if function is called multiple times
+        #logger.addHandler(logging.FileHandler(log_file))
 
         env = GraphEnv(num_nodes=num_nodes,num_agents=num_agents)
         if torch.cuda.is_available():
@@ -144,8 +146,9 @@ class dpmrl_trainer:
         uncertainty_history:list = []
         last_state = None
         x_state = None
-
+        print(f"{max_iters} {num_iters}")
         while env.agents and max_iters>num_iters:
+
             if env.num_moves%env.max_moves == 0 and env.num_moves !=0:
                 self.save_marl_checkpoint(episode=env.num_moves,obs_nets=obs_nets, model=self.model,unc_nets=env.agent_to_net,optimizers=optimizers,epoch=env.num_epochs,ag_num=num_agents,num_nodes=num_nodes,random_seed=random_seed)
                 self.diagnostic_plots(step=env.num_moves, reward_history=reward_history[agent],epoch=env.num_epochs,uncertainty_history=uncertainty_history,neural_net_history=net_loss[agent])
@@ -154,7 +157,7 @@ class dpmrl_trainer:
                 uncertainty_history = []
                 reward_history:dict = {agent:[] for agent in env.possible_agents}
                 num_iters+=1
-                logging.info(f"Iteration Changing to {num_iters}")
+               # logger.info(f"Iteration Changing to {num_iters}")
 
             actions={}
 
@@ -170,7 +173,7 @@ class dpmrl_trainer:
             for agent in env.agents:
                 if x_state is not None:
                    last_state = x_state
-                logits, value, x_state, edges = obs_nets[agent](mental_map_nx=env.mental_map[agent], mask=env.action_mask_to_node[int(agent[6:])],unc_net=env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
+                logits, value, x_state, edges = obs_nets[agent](mental_map_nx=env.mental_map[agent], mask=env.action_mask_to_node[env.agent_position[agent]],unc_net=env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]],position=env.agent_position[agent])
                 unc_net = env.agent_to_net[agent]
                 if last_state is None:
                     #print(x_state.shape)
@@ -197,7 +200,7 @@ class dpmrl_trainer:
             for agent in env.agents:
                 reward = torch.tensor([rewards[agent]], device=dev)
 
-                _,next_val,_,_ = obs_nets[agent](env.mental_map[agent], env.action_mask_to_node[int(agent[6:])],env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
+                _,next_val,_,_ = obs_nets[agent](env.mental_map[agent], env.action_mask_to_node[env.agent_position[agent]],env.agent_to_net[agent],num_moves=env.num_moves,neighbors=env.action_mask_to_node[env.agent_position[agent]], position =env.agent_position[agent])
                 value = values[agent]
                 log_prob = actions[agent]
                 if env.step==env.max_moves-1:
@@ -208,7 +211,7 @@ class dpmrl_trainer:
                 total_loss = self.compute_ac_loss(log_prob, value, reward, next_val, done)
 
                 optimizers[agent].zero_grad()
-                logging.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
+             #   logger.info(f"{env.num_moves}, {agent}, {reward.item()} ,{int(total_loss.item())}, {actions[agent].item()}, {env.tot_unc}, {int(value.item())}, {int(next_val.item())}, {env.occupied_targets}, {int(unc_loss_dict[agent])}")
                 total_loss.backward()
                 optimizers[agent].step()
                 
