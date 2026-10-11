@@ -71,7 +71,6 @@ flowchart LR
 ```
 dpmrl/
 ├── requirements.txt
-├── TODO.md
 └── custom_environment/
     ├── create_custom_graph.py          # random graph generator (.graphml)
     ├── graphs/                         # bundled graph files
@@ -385,7 +384,7 @@ All variants live in `decentralized_agents/model_variants/`.
 
 ## Project status
 
-DPMRL is active research code and is not yet a polished package. Known rough edges, also tracked in [TODO.md](TODO.md):
+DPMRL is active research code and is not yet a polished package. Known issues include:
 
 - Command-line interfaces for training and evaluation are being replaced with a proper parser; use the Python API shown above for now.
 - Centralized training and evaluation are in progress.
